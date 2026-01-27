@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Auth } from './Auth';
 import { Dashboard } from './Dashboard';
@@ -18,7 +19,7 @@ import { ProfileView } from './ProfileView';
 import { VehicleList, VehicleForm, VestList, VestForm, RadioList, RadioForm, EquipmentList, EquipmentForm } from './AssetViews';
 import { LoanViews } from './LoanViews';
 import { User, Building, Incident, ViewState, UserRole, Sector, AlterationType, SystemLog, Vehicle, Vest, Radio, Equipment, LoanRecord, SystemPermissionMap, PermissionKey, UserPermissionOverrides } from '../types';
-import { LayoutDashboard, Building as BuildingIcon, Users, LogOut, Menu, FileText, Pencil, Plus, Map, Trash2, ChevronRight, Shield, Loader2, Search, PieChart as PieChartIcon, Download, Filter, CheckCircle, Clock, X, AlertCircle, Database, Settings, UserCheck, Moon, Sun, Wrench, ChevronDown, FolderOpen, Car, Radio as RadioIcon, Package, ArrowRightLeft, CloudOff, History, Ban, XCircle, Tag, RefreshCw, Bell, Key, Hash, FileSpreadsheet, Home, MoreHorizontal, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Building as BuildingIcon, Users, LogOut, Menu, FileText, Pencil, Plus, Map, Trash2, ChevronRight, Shield, Loader2, Search, PieChart as PieChartIcon, Download, Filter, CheckCircle, Clock, X, AlertCircle, Database, Settings, UserCheck, Moon, Sun, Wrench, ChevronDown, FolderOpen, Car, Radio as RadioIcon, Package, ArrowRightLeft, CloudOff, History, Ban, XCircle, Tag, RefreshCw, Bell, Key, Hash, FileSpreadsheet } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 declare var html2pdf: any;
@@ -475,10 +476,6 @@ export function App() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [pendingSubTab, setPendingSubTab] = useState<'INCIDENTS' | 'LOANS'>('INCIDENTS');
   
-  // Mobile States
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [registrationsSubMenu, setRegistrationsSubMenu] = useState(false);
-
   // Data States
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -528,6 +525,8 @@ export function App() {
   const buildDate = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : '---';
   const APP_VERSION = `v${appVersion}-${gitHash}`; 
   const DISPLAY_VERSION = `${appVersion}.${gitHash} (${buildDate})`;
+
+  // --- FETCH FUNCTIONS INSIDE APP COMPONENT ---
 
   const fetchIncidents = useCallback(async (isLoadMore = false) => {
     if (fetchLockRef.current) return;
@@ -686,8 +685,12 @@ export function App() {
 
   const can = (action: PermissionKey): boolean => {
     if (!user) return false;
+    
+    // Check for user-specific override first
     const override = userOverrides[user.id]?.[action];
     if (override !== undefined) return override;
+
+    // Fallback to role-based permission
     const allowedRoles = permissions[action] || [];
     return allowedRoles.includes(user.role);
   };
@@ -759,7 +762,7 @@ export function App() {
 
   useEffect(() => { if (user && !initialDataLoaded) { loadEssentialData(); } }, [user, initialDataLoaded, loadEssentialData]);
   
-  const handleNavigate = (newView: ViewState) => { setView(newView); setSidebarOpen(false); setMobileMenuOpen(false); };
+  const handleNavigate = (newView: ViewState) => { setView(newView); setSidebarOpen(false); };
 
   const handleDeleteSector = (id: string) => {
       showConfirm("Remover Setor", "Deseja realmente remover este setor?", async () => {
@@ -1005,20 +1008,20 @@ export function App() {
                         </h2>
                     </div>
 
-                    <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full md:w-auto border border-transparent md:border-slate-200 md:dark:border-slate-700/50">
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full md:w-auto">
                         <button 
                             onClick={() => setPendingSubTab('INCIDENTS')}
-                            className={`flex-1 md:flex-none px-6 py-2 md:px-8 md:py-2.5 rounded-lg text-[10px] md:text-xs font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'INCIDENTS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5 md:shadow-md md:ring-0' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'INCIDENTS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
                             Atendimentos
-                            {pendingIncidentsCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]">{pendingIncidentsCount}</span>}
+                            {pendingIncidentsCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px]">{pendingIncidentsCount}</span>}
                         </button>
                         <button 
                             onClick={() => setPendingSubTab('LOANS')}
-                            className={`flex-1 md:flex-none px-6 py-2 md:px-8 md:py-2.5 rounded-lg text-[10px] md:text-xs font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'LOANS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5 md:shadow-md md:ring-0' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'LOANS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         >
                             Cautelas
-                            {pendingLoansCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px] md:text-[10px]">{pendingLoansCount}</span>}
+                            {pendingLoansCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px]">{pendingLoansCount}</span>}
                         </button>
                     </div>
                 </div>
@@ -1086,157 +1089,21 @@ export function App() {
       case 'DATABASE_TOOLS': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} isLocalMode={isLocalMode} onToggleLocalMode={handleToggleLocalMode} unsyncedCount={unsyncedIncidents.length} onSync={handleSyncData} initialTab='DATABASE' onLogAction={createLog} permissions={permissions} onUpdatePermissions={handleUpdatePermissions} />;
       case 'INCIDENT_DETAIL': return <IncidentDetail incident={selectedIncident!} building={buildings.find(b => b.id === selectedIncident?.buildingId)} author={users.find(u => u.id === selectedIncident?.userId)} onBack={() => handleNavigate('DASHBOARD')} onApprove={handleApproveIncident} onEdit={() => { setEditingIncident(selectedIncident); handleNavigate('NEW_RECORD'); }} onDelete={handleDeleteIncident} customLogo={customLogoRight} customLogoLeft={customLogoLeft} canEdit={can('EDIT_INCIDENT')} canDelete={can('DELETE_INCIDENT')} canApprove={can('APPROVE_INCIDENT')} />;
       case 'PROFILE': return <ProfileView user={user!} onUpdatePassword={handleUpdatePassword} />;
-      default: return <Dashboard incidents={incidents} buildings={buildings} sectors={sectors} onViewIncident={handleViewIncident} onNavigate={handleNavigate} onRefresh={() => fetchIncidents(false)} onNewIncidentWithBuilding={(bId) => { setPreSelectedBuildingId(bId); setEditingIncident(null); handleNavigate('NEW_RECORD'); }} />;
+      default: return <Dashboard incidents={incidents} buildings={buildings} sectors={sectors} onViewIncident={handleViewIncident} onNavigate={handleNavigate} onRefresh={() => fetchIncidents(false)} />;
     }
   };
 
   if (!user) return <Auth onLogin={handleLogin} onRegister={handleRegister} darkMode={darkMode} onToggleDarkMode={() => setDarkMode(!darkMode)} customLogo={customLogoRight} onShowSetup={() => setShowDbSetup(true)} systemVersion={DISPLAY_VERSION} users={users} isLocalMode={isLocalMode} onToggleLocalMode={handleToggleLocalMode} unsyncedCount={unsyncedIncidents.length} onSync={handleSyncData} />;
   const pendingIncidentsCount = incidents.filter(i => i.status === 'PENDING').length;
+  // Conta lotes (batches) pendentes para o usuário logado (recebedor)
   const pendingLoansCount = Array.from(new Set(loans.filter(l => l.status === 'PENDING' && l.receiverId === user.id).map(l => l.batchId))).length;
+  // Badge total é a soma
   const totalPendingBadge = pendingIncidentsCount + pendingLoansCount;
 
-  // --- MOBILE BOTTOM NAV ---
-  const MobileBottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 py-2 z-40 md:hidden">
-        <button 
-            onClick={() => handleNavigate('DASHBOARD')} 
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${view === 'DASHBOARD' ? 'text-blue-500' : 'text-slate-500'}`}
-        >
-            <Home size={22} className="mb-1" strokeWidth={view === 'DASHBOARD' ? 2.5 : 2} />
-            <span className="text-[9px] font-black uppercase">Início</span>
-        </button>
-        <button 
-            onClick={() => { setEditingIncident(null); handleNavigate('NEW_RECORD'); }} 
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${view === 'NEW_RECORD' ? 'text-blue-500' : 'text-slate-500'}`}
-        >
-            <FileText size={22} className="mb-1" strokeWidth={view === 'NEW_RECORD' ? 2.5 : 2} />
-            <span className="text-[9px] font-black uppercase">R.A</span>
-        </button>
-        <button 
-            onClick={() => handleNavigate('LOANS')} 
-            className={`flex flex-col items-center p-2 rounded-xl transition-all ${view === 'LOANS' ? 'text-blue-500' : 'text-slate-500'}`}
-        >
-            <ArrowRightLeft size={22} className="mb-1" strokeWidth={view === 'LOANS' ? 2.5 : 2} />
-            <span className="text-[9px] font-black uppercase">Cautelas</span>
-        </button>
-        <button 
-            onClick={() => handleNavigate('PENDING_APPROVALS')} 
-            className={`flex flex-col items-center p-2 rounded-xl transition-all relative ${view === 'PENDING_APPROVALS' ? 'text-blue-500' : 'text-slate-500'}`}
-        >
-            <UserCheck size={22} className="mb-1" strokeWidth={view === 'PENDING_APPROVALS' ? 2.5 : 2} />
-            <span className="text-[9px] font-black uppercase">Pendências</span>
-            {totalPendingBadge > 0 && <span className="absolute top-1 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900"></span>}
-        </button>
-        <button 
-            onClick={() => setMobileMenuOpen(true)} 
-            className={`flex flex-col items-center p-2 rounded-xl text-slate-500`}
-        >
-            <MoreHorizontal size={22} className="mb-1" />
-            <span className="text-[9px] font-black uppercase">Mais</span>
-        </button>
-    </div>
-  );
-
-  // --- MOBILE FULL SCREEN MENU (OVERLAY) ---
-  const MobileMenuOverlay = () => {
-      if (!mobileMenuOpen) return null;
-
-      const MenuGridButton = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) => (
-          <button 
-            onClick={() => { onClick(); setMobileMenuOpen(false); }}
-            className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-md aspect-square"
-          >
-              <div className="text-slate-300">{icon}</div>
-              <span className="text-[10px] font-black uppercase text-center text-white leading-tight">{label}</span>
-          </button>
-      );
-
-      const SubMenuGridButton = ({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) => (
-        <button 
-          onClick={() => { onClick(); setMobileMenuOpen(false); }}
-          className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-md aspect-square"
-        >
-            <div className="text-blue-400">{icon}</div>
-            <span className="text-[10px] font-black uppercase text-center text-white leading-tight">{label}</span>
-        </button>
-      );
-
-      return (
-          <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col animate-in slide-in-from-bottom-10 duration-200">
-              <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-                  <h2 className="text-lg font-black text-white uppercase tracking-tight">Menu Completo</h2>
-                  <button onClick={() => { setMobileMenuOpen(false); setRegistrationsSubMenu(false); }} className="p-2 bg-slate-900 rounded-full text-slate-400">
-                      <X size={20} />
-                  </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                  {!registrationsSubMenu ? (
-                      <div className="space-y-6">
-                          <div>
-                              <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest mb-3">Operacional</h3>
-                              <div className="grid grid-cols-2 gap-3">
-                                  <MenuGridButton icon={<Clock size={24}/>} label="Pendentes" onClick={() => handleNavigate('PENDING_APPROVALS')} />
-                                  <MenuGridButton icon={<FileText size={24}/>} label="Histórico R.A" onClick={() => handleNavigate('HISTORY')} />
-                                  <MenuGridButton icon={<ArrowRightLeft size={24}/>} label="Hist. Cautelas" onClick={() => handleNavigate('LOAN_HISTORY')} />
-                                  <MenuGridButton icon={<PieChartIcon size={24}/>} label="Estatísticas" onClick={() => handleNavigate('CHARTS')} />
-                              </div>
-                          </div>
-
-                          <div>
-                              <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest mb-3">Administração</h3>
-                              <div className="grid grid-cols-2 gap-3">
-                                  <button 
-                                    onClick={() => setRegistrationsSubMenu(true)}
-                                    className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-md aspect-square"
-                                  >
-                                      <div className="text-slate-300"><FolderOpen size={24}/></div>
-                                      <span className="text-[10px] font-black uppercase text-center text-white leading-tight">Cadastros</span>
-                                  </button>
-                                  <MenuGridButton icon={<History size={24}/>} label="Log Sistema" onClick={() => handleNavigate('LOGS')} />
-                                  <MenuGridButton icon={<Database size={24}/>} label="Banco de Dados" onClick={() => handleNavigate('DATABASE_TOOLS')} />
-                                  <MenuGridButton icon={<Key size={24}/>} label="Permissões" onClick={() => handleNavigate('PERMISSIONS_TOOLS')} />
-                                  <MenuGridButton icon={<Settings size={24}/>} label="Sistema" onClick={() => handleNavigate('TOOLS')} />
-                              </div>
-                          </div>
-                      </div>
-                  ) : (
-                      <div className="space-y-6 animate-in slide-in-from-right-10 duration-200">
-                          <div className="flex items-center gap-2 mb-2">
-                              <button onClick={() => setRegistrationsSubMenu(false)} className="p-1 bg-slate-800 rounded-lg text-slate-400"><ArrowLeft size={16}/></button>
-                              <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest">Cadastros</h3>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                              <SubMenuGridButton icon={<Users size={24}/>} label="Colaboradores" onClick={() => handleNavigate('USERS')} />
-                              <SubMenuGridButton icon={<Car size={24}/>} label="Frota" onClick={() => handleNavigate('VEHICLES')} />
-                              <SubMenuGridButton icon={<Shield size={24}/>} label="Coletes" onClick={() => handleNavigate('VESTS')} />
-                              <SubMenuGridButton icon={<RadioIcon size={24}/>} label="Rádios" onClick={() => handleNavigate('RADIOS')} />
-                              <SubMenuGridButton icon={<Package size={24}/>} label="Outros" onClick={() => handleNavigate('EQUIPMENTS')} />
-                              <SubMenuGridButton icon={<BuildingIcon size={24}/>} label="Próprios" onClick={() => handleNavigate('BUILDINGS')} />
-                              <SubMenuGridButton icon={<Tag size={24}/>} label="Tipos R.A" onClick={() => handleNavigate('ALTERATION_TYPES')} />
-                              <SubMenuGridButton icon={<Map size={24}/>} label="Setores" onClick={() => handleNavigate('SECTORS')} />
-                          </div>
-                      </div>
-                  )}
-              </div>
-
-              <div className="p-4 border-t border-slate-800">
-                  <button 
-                    onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                    className="w-full py-4 rounded-xl border border-red-900/50 bg-red-950/20 text-red-500 font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"
-                  >
-                      <LogOut size={18} /> Encerrar Sessão
-                  </button>
-                  <p className="text-center text-[9px] text-slate-600 mt-4 font-mono font-bold">{DISPLAY_VERSION}</p>
-              </div>
-          </div>
-      );
-  };
-
   return (
-    <div className="min-h-screen flex transition-colors duration-200 bg-slate-100 dark:bg-slate-950">
-      {/* DESKTOP SIDEBAR - Hidden on Mobile */}
-      <aside className={`hidden lg:flex flex-col z-50 bg-brand-900 transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+    <div className="min-h-screen flex transition-colors duration-200">
+      {sidebarOpen && <div className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`fixed inset-y-0 left-0 z-50 bg-brand-900 transform transition-all duration-300 lg:relative ${sidebarOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full lg:translate-x-0'} ${isSidebarCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
         <div className="h-full flex flex-col text-white">
           <div className={`flex flex-col items-center justify-center border-b border-brand-800 transition-all duration-300 ${isSidebarCollapsed ? 'h-20 px-2' : 'h-32 px-4'}`}>
             <div className={`transition-all duration-300 flex items-center justify-center ${isSidebarCollapsed ? 'h-10 w-10' : 'h-16 w-16 mb-2'}`}>
@@ -1315,12 +1182,11 @@ export function App() {
           </nav>
         </div>
       </aside>
-
       <div className="flex-1 flex flex-col min-w-0">
-        {/* DESKTOP HEADER - Hidden on Mobile */}
-        <header className="hidden lg:flex h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-800 items-center px-4 md:px-8 justify-between shadow-sm z-30 transition-colors duration-200">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b dark:border-slate-800 flex items-center px-4 md:px-8 justify-between shadow-sm z-30 transition-colors duration-200">
           <div className="flex items-center gap-4">
-             <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Gestão Municipal</h2>
+             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden p-2"><Menu /></button>
+             <h2 className="hidden md:block text-xs font-black uppercase text-slate-400 tracking-widest">Gestão Municipal</h2>
              {isLocalMode && <span className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded text-[9px] font-black uppercase animate-pulse"><CloudOff size={12}/> Offline Ativado</span>}
           </div>
           <div className="flex items-center gap-3">
@@ -1334,15 +1200,8 @@ export function App() {
               </button>
           </div>
         </header>
-
-        <main className="flex-1 overflow-y-auto p-0 md:p-8 bg-slate-950 md:bg-slate-100 md:dark:bg-slate-950">
-            {renderContent()}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">{renderContent()}</main>
       </div>
-
-      <MobileBottomNav />
-      <MobileMenuOverlay />
-
       {showDbSetup && <DatabaseSetup onClose={() => setShowDbSetup(false)} />}
       <Modal isOpen={modalConfig.isOpen} type={modalConfig.type} title={modalConfig.title} message={modalConfig.message} onConfirm={modalConfig.onConfirm} onClose={closeModal} />
     </div>
