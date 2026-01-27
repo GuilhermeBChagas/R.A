@@ -2,7 +2,7 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { Incident, Building, Sector, ViewState } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { CheckCircle, Clock, Activity, Zap, Plus, ArrowRight, CalendarClock, FileText, Search, MapPin, Loader2, Navigation, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Clock, Activity, Zap, Plus, ArrowRight, CalendarClock, FileText, Search, MapPin, Loader2, Navigation, AlertTriangle, User } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 interface DashboardProps {
@@ -162,9 +162,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ incidents, buildings, sect
     .slice(0, 5);
   }, [sectors, buildings, incidents]);
 
+  // Cálculo de Porcentagem para Mobile
+  const sectorPercentages = useMemo(() => {
+      const total = chartData.reduce((acc, curr) => acc + curr.count, 0) || 1;
+      return chartData.map(s => ({
+          ...s,
+          percent: Math.round((s.count / total) * 100)
+      }));
+  }, [chartData]);
+
   const COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef'];
 
-  return (
+  // ----------------------------------------------------------------------
+  // DESKTOP LAYOUT (PRESERVED)
+  // ----------------------------------------------------------------------
+  const DesktopLayout = () => (
     <div className="space-y-8 animate-fade-in pb-10">
       
       {/* ÁREA DE AÇÃO RÁPIDA (PESQUISA DE PRÉDIOS) */}
@@ -417,5 +429,118 @@ export const Dashboard: React.FC<DashboardProps> = ({ incidents, buildings, sect
 
       </div>
     </div>
+  );
+
+  // ----------------------------------------------------------------------
+  // MOBILE LAYOUT (NEW)
+  // ----------------------------------------------------------------------
+  const MobileLayout = () => (
+    <div className="space-y-6 pt-2 pb-24 animate-fade-in px-2">
+        {/* Header Mobile */}
+        <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-black text-white uppercase tracking-tight">
+                VIGILANTE
+            </h1>
+            <div className="h-10 w-10 bg-slate-800 rounded-full flex items-center justify-center text-white border border-slate-700">
+                <User size={20} />
+            </div>
+        </div>
+
+        {/* Busca Mobile */}
+        <div className="relative mb-6">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search size={20} className="text-slate-500" />
+            </div>
+            <input 
+                type="text"
+                placeholder="LOCALIZAR POSTO..."
+                value={buildingSearchTerm}
+                onFocus={() => { 
+                    setIsBuildingListOpen(true);
+                    onNavigate('BUILDINGS'); // Opcional: Redirecionar para lista completa se preferir
+                }}
+                onChange={(e) => setBuildingSearchTerm(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl py-4 pl-12 pr-4 text-sm font-bold uppercase placeholder-slate-600 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all shadow-lg"
+            />
+        </div>
+
+        {/* Cards Resumo Mobile */}
+        <div className="grid grid-cols-2 gap-4">
+            {/* Pendentes (Grande) */}
+            <div 
+                onClick={() => onNavigate('PENDING_APPROVALS')}
+                className="col-span-1 row-span-2 bg-slate-900 rounded-2xl p-5 border border-slate-800 flex flex-col justify-between relative overflow-hidden group active:scale-95 transition-all"
+            >
+                <div className="absolute top-0 right-0 p-2">
+                    <span className="bg-red-500/20 text-red-500 text-[9px] font-black px-2 py-1 rounded uppercase">Ação</span>
+                </div>
+                <div className="p-2 bg-slate-800 rounded-xl w-fit text-red-500 mb-2">
+                    <AlertTriangle size={24} />
+                </div>
+                <div>
+                    <h2 className="text-4xl font-black text-white leading-none mb-1">{globalMetrics.pending}</h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Pendentes</p>
+                </div>
+            </div>
+
+            {/* Hoje */}
+            <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex flex-col justify-center active:scale-95 transition-all">
+                <div className="p-2 bg-blue-900/20 rounded-lg w-fit text-blue-500 mb-2">
+                    <Clock size={18} />
+                </div>
+                <h2 className="text-2xl font-black text-white leading-none">{globalMetrics.today}</h2>
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Hoje</p>
+            </div>
+
+            {/* Finalizados */}
+            <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 flex flex-col justify-center active:scale-95 transition-all">
+                <div className="p-2 bg-emerald-900/20 rounded-lg w-fit text-emerald-500 mb-2">
+                    <CheckCircle size={18} />
+                </div>
+                <h2 className="text-2xl font-black text-white leading-none">{globalMetrics.approved}</h2>
+                <p className="text-[9px] font-bold text-slate-500 uppercase">Finalizados</p>
+            </div>
+        </div>
+
+        {/* Setores Críticos Mobile */}
+        <div className="bg-slate-900 rounded-2xl p-5 border border-slate-800">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Activity size={14} className="text-blue-500" /> Setores Críticos
+            </h3>
+            <div className="space-y-4">
+                {sectorPercentages.map((sector, idx) => (
+                    <div key={idx} className="space-y-1">
+                        <div className="flex justify-between items-end">
+                            <span className="text-[10px] font-bold text-slate-300 uppercase">{sector.name}</span>
+                            <span className="text-[10px] font-black text-slate-500">{sector.percent}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full rounded-full transition-all duration-1000 ease-out"
+                                style={{ 
+                                    width: `${sector.percent}%`,
+                                    backgroundColor: COLORS[idx % COLORS.length]
+                                }}
+                            />
+                        </div>
+                    </div>
+                ))}
+                {sectorPercentages.length === 0 && (
+                    <p className="text-[10px] text-slate-600 text-center py-4 uppercase">Sem dados suficientes</p>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
+  return (
+    <>
+        <div className="hidden md:block">
+            <DesktopLayout />
+        </div>
+        <div className="md:hidden">
+            <MobileLayout />
+        </div>
+    </>
   );
 };
