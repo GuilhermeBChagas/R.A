@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Auth } from './Auth';
 import { Dashboard } from './Dashboard';
@@ -1000,31 +1001,6 @@ export function App() {
       case 'PENDING_APPROVALS': 
         return (
             <div className="space-y-6 animate-fade-in">
-                <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-center gap-2">
-                    <div className="px-4 py-2">
-                        <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase tracking-wide flex items-center gap-2">
-                             <UserCheck size={18} className="text-blue-600" /> Central de Pendências
-                        </h2>
-                    </div>
-
-                    <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full md:w-auto">
-                        <button 
-                            onClick={() => setPendingSubTab('INCIDENTS')}
-                            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'INCIDENTS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                        >
-                            Atendimentos
-                            {pendingIncidentsCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px]">{pendingIncidentsCount}</span>}
-                        </button>
-                        <button 
-                            onClick={() => setPendingSubTab('LOANS')}
-                            className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 ${pendingSubTab === 'LOANS' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                        >
-                            Cautelas
-                            {pendingLoansCount > 0 && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[9px]">{pendingLoansCount}</span>}
-                        </button>
-                    </div>
-                </div>
-
                 <div className="animate-in slide-in-from-bottom-2 duration-300">
                     {pendingSubTab === 'INCIDENTS' ? (
                          <IncidentHistory 
