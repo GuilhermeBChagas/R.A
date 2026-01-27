@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Auth } from './Auth';
 import { Dashboard } from './Dashboard';
@@ -469,6 +467,7 @@ export function App() {
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
   const [registrationsMenuOpen, setRegistrationsMenuOpen] = useState(false); 
   const [reportsMenuOpen, setReportsMenuOpen] = useState(false); 
+  const [pendentesMenuOpen, setPendentesMenuOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -1127,7 +1126,17 @@ export function App() {
                         <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'LOAN_HISTORY'} onClick={() => handleNavigate('LOAN_HISTORY')} collapsed={isSidebarCollapsed} isSubItem />
                      </div>
                 )}
-                <NavItem icon={<UserCheck />} label="Pendentes" active={view === 'PENDING_APPROVALS'} onClick={() => handleNavigate('PENDING_APPROVALS')} collapsed={isSidebarCollapsed} badge={totalPendingBadge > 0 ? totalPendingBadge : undefined} />
+                <div className="relative">
+                    <NavItem icon={<UserCheck />} label="Pendentes" active={view === 'PENDING_APPROVALS'} onClick={() => setPendentesMenuOpen(!pendentesMenuOpen)} collapsed={isSidebarCollapsed} badge={totalPendingBadge > 0 ? totalPendingBadge : undefined} />
+                    {!isSidebarCollapsed && <div className={`absolute top-3.5 pointer-events-none text-brand-300 ${totalPendingBadge > 0 ? 'right-10' : 'right-3'}`}>{pendentesMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
+                </div>
+                {pendentesMenuOpen && !isSidebarCollapsed && (
+                     <div className="space-y-1 mt-1">
+                        <NavItem label="Atendimentos" icon={<FileText size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'INCIDENTS'} onClick={() => { setPendingSubTab('INCIDENTS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingIncidentsCount > 0 ? pendingIncidentsCount : undefined} />
+                        <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'LOANS'} onClick={() => { setPendingSubTab('LOANS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingLoansCount > 0 ? pendingLoansCount : undefined} />
+                     </div>
+                )}
+                
                 <NavItem icon={<PieChartIcon />} label="Estatísticas" active={view === 'CHARTS'} onClick={() => handleNavigate('CHARTS')} collapsed={isSidebarCollapsed} />
             </div>
             {(can('MANAGE_ASSETS') || can('MANAGE_USERS') || can('MANAGE_SETTINGS')) && (
