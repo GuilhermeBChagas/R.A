@@ -209,7 +209,7 @@ const IncidentHistory: React.FC<{
                 </div>
                 <div>
                     <h2 className="text-lg font-black text-slate-800 dark:text-slate-100 uppercase leading-none">
-                        {filterStatus === 'PENDING' ? 'Pendentes' : 'Histórico de Atendimentos'}
+                        {filterStatus === 'PENDING' ? 'Atendimentos Pendentes' : 'Histórico de Atendimentos'}
                     </h2>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
                         {filterStatus === 'PENDING' ? 'Aguardando validação ou recebimento' : 'Registros validados e cancelados'}
@@ -1033,6 +1033,7 @@ export function App() {
                             loans={loans} 
                             onRefresh={() => fetchLoans(false)} 
                             initialTab="ACTIVE"
+                            filterStatus="PENDING"
                         />
                     )}
                 </div>
@@ -1050,7 +1051,7 @@ export function App() {
       case 'RADIO_FORM': return <RadioForm initialData={editingRadio} onSave={(i: any) => handleSaveAsset('radios', i, 'RADIOS', 'Rádio')} onCancel={() => handleNavigate('RADIOS')} onDelete={() => editingRadio && handleDeleteAsset('radios', editingRadio.id, 'Rádio')} />;
       case 'EQUIPMENTS': return <EquipmentList items={equipments} onAdd={() => { setEditingEquipment(null); handleNavigate('EQUIPMENT_FORM'); }} onEdit={(i) => { setEditingEquipment(i); handleNavigate('EQUIPMENT_FORM'); }} onDelete={(id) => handleDeleteAsset('equipments', id, 'Equipamento')} />;
       case 'EQUIPMENT_FORM': return <EquipmentForm initialData={editingEquipment} onSave={(i: any) => handleSaveAsset('equipments', i, 'EQUIPMENTS', 'Equipamento')} onCancel={() => handleNavigate('EQUIPMENTS')} onDelete={() => editingEquipment && handleDeleteAsset('equipments', editingEquipment.id, 'Equipamento')} />;
-      case 'LOANS': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} loans={loans} onRefresh={() => fetchLoans(false)} />;
+      case 'LOANS': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} loans={loans} onRefresh={() => fetchLoans(false)} filterStatus="ACTIVE" />;
       case 'LOAN_HISTORY': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} initialTab="HISTORY" isReportView={true} loans={loans} onRefresh={() => fetchLoans(false)} hasMore={hasMoreLoans} isLoadingMore={loadingMoreLoans} onLoadMore={() => fetchLoans(true)} />;
       case 'SECTORS': return <SectorList sectors={sectors} onEdit={(s) => { setEditingSector(s); handleNavigate('SECTOR_FORM'); }} onDelete={handleDeleteSector} onAdd={() => { setEditingSector(null); handleNavigate('SECTOR_FORM'); }} />;
       case 'SECTOR_FORM': return <SectorForm initialData={editingSector} onSave={handleSaveSector} onCancel={() => handleNavigate('SECTORS')} onDelete={handleDeleteSector} />;
