@@ -116,6 +116,33 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
       );
   };
 
+  // --- BATCH RETURN LOGIC (NEW) ---
+  const handleReturnBatch = (loansToReturn: LoanRecord[]) => {
+      if (loansToReturn.length === 0) return;
+      const receiverName = loansToReturn[0].receiverName;
+
+      onShowConfirm(
+          "Devolver Todos",
+          `Confirmar a devolução de ${loansToReturn.length} itens de ${receiverName}?`,
+          async () => {
+              try {
+                  const ids = loansToReturn.map(l => l.id);
+                  const { error } = await supabase.from('loan_records').update({
+                      status: 'COMPLETED',
+                      return_time: new Date().toISOString()
+                  }).in('id', ids);
+
+                  if (error) throw error;
+                  onLogAction('LOAN_RETURN', `Recebeu devolução de lote (${loansToReturn.length} itens) de ${receiverName}`);
+                  setTimeout(() => onRefresh(), 200);
+              } catch (err: any) {
+                  console.error("Erro ao devolver lote:", err);
+                  alert('Erro ao processar devolução em lote: ' + err.message);
+              }
+          }
+      );
+  };
+
   const handleConfirm = async (loan: LoanRecord) => {
        try {
           const { error } = await supabase.from('loan_records').update({ status: 'ACTIVE' }).eq('id', loan.id);
@@ -161,14 +188,30 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   
   const sortedLoans = [...filteredLoans].sort((a, b) => new Date(b.checkoutTime).getTime() - new Date(a.checkoutTime).getTime());
 
-  // Agrupamento por Batch (Lote) para visualização de Pendentes
+  // Agrupamento por Batch (Lote) para visualização de PENDENTES
   const groupedPendingLoans = useMemo(() => {
       if (filterStatus !== 'PENDING') return null;
       
       const groups: Record<string, LoanRecord[]> = {};
       sortedLoans.forEach(loan => {
-          // Usa batchId se existir, senão usa receiverId como fallback para agrupar por pessoa
           const key = loan.batchId || loan.receiverId;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(loan);
+      });
+
+      return Object.values(groups).sort((a, b) => 
+          new Date(b[0].checkoutTime).getTime() - new Date(a[0].checkoutTime).getTime()
+      );
+  }, [sortedLoans, filterStatus]);
+
+  // Agrupamento por RECEBEDOR para visualização de ATIVOS (para devolução)
+  const groupedActiveLoans = useMemo(() => {
+      if (filterStatus !== 'ACTIVE') return null;
+
+      const groups: Record<string, LoanRecord[]> = {};
+      sortedLoans.forEach(loan => {
+          // Agrupa por Recebedor (usuário) para facilitar a devolução de tudo o que está com ele
+          const key = loan.receiverId;
           if (!groups[key]) groups[key] = [];
           groups[key].push(loan);
       });
@@ -467,8 +510,73 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                 </div>
                            )}
                        </div>
+                  ) : filterStatus === 'ACTIVE' && groupedActiveLoans ? (
+                      /* LOGIC FOR ACTIVE GROUPING (BY RECEIVER) */
+                      <div className="grid gap-4">
+                           {groupedActiveLoans.map((group, index) => {
+                               const firstLoan = group[0];
+                               return (
+                                   <div key={index} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2">
+                                       {/* Active Group Header */}
+                                       <div className="bg-slate-50 dark:bg-slate-800 p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                           <div>
+                                               <div className="flex items-center gap-2 mb-1">
+                                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1">
+                                                        <ArrowRightLeft size={12} /> Cautela Ativa
+                                                    </span>
+                                               </div>
+                                               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
+                                                   <UserIcon size={16} className="text-blue-500" /> {firstLoan.receiverName}
+                                               </h3>
+                                               <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 pl-6">{group.length} Itens em posse</p>
+                                           </div>
+                                           <div className="w-full md:w-auto">
+                                                <button 
+                                                    onClick={() => handleReturnBatch(group)}
+                                                    className="w-full md:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                                                >
+                                                    <CornerDownLeft size={14} /> Devolver Todos ({group.length})
+                                                </button>
+                                           </div>
+                                       </div>
+
+                                       {/* Active Items */}
+                                       <div className="p-2 space-y-1">
+                                           {group.map(loan => (
+                                               <div key={loan.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
+                                                   <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg">
+                                                       {getAssetIcon(loan.assetType)}
+                                                   </div>
+                                                   <div className="flex-1">
+                                                       <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">{loan.assetDescription}</p>
+                                                       <div className="flex gap-2">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase">{loan.assetType === 'VEHICLE' ? 'Veículo' : loan.assetType === 'VEST' ? 'Colete' : loan.assetType === 'RADIO' ? 'Rádio' : 'Equipamento'}</p>
+                                                            <span className="text-[9px] font-mono text-slate-400">• Retirado em {new Date(loan.checkoutTime).toLocaleDateString()} {new Date(loan.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                       </div>
+                                                   </div>
+                                                   {/* Individual return button */}
+                                                   <button 
+                                                        onClick={() => handleReturn(loan)}
+                                                        className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1 border border-slate-200 dark:border-slate-700"
+                                                        title="Devolver apenas este item"
+                                                   >
+                                                       <CornerDownLeft size={14} /> <span className="text-[9px] font-bold uppercase hidden sm:inline">Devolver</span>
+                                                   </button>
+                                               </div>
+                                           ))}
+                                       </div>
+                                   </div>
+                               );
+                           })}
+                           {groupedActiveLoans.length === 0 && (
+                                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                    <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs font-bold text-slate-400 uppercase">Nenhuma cautela ativa encontrada</p>
+                                </div>
+                           )}
+                      </div>
                   ) : (
-                    /* LIST FOR ACTIVE / HISTORY (FLAT LIST) */
+                    /* LIST FOR HISTORY (FLAT LIST) */
                     <div className="grid gap-3">
                         {sortedLoans.map(loan => (
                             <div key={loan.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -492,22 +600,6 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                 </div>
                                 
                                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                                    {loan.status === 'PENDING' && (
-                                        <button 
-                                            onClick={() => handleConfirm(loan)}
-                                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-700 transition-colors flex items-center gap-1"
-                                        >
-                                            <CheckCircle size={12} /> Confirmar
-                                        </button>
-                                    )}
-                                    {loan.status === 'ACTIVE' && (
-                                        <button 
-                                            onClick={() => handleReturn(loan)}
-                                            className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase hover:bg-slate-700 transition-colors flex items-center gap-1"
-                                        >
-                                            <CornerDownLeft size={12} /> Devolver
-                                        </button>
-                                    )}
                                     {loan.status === 'COMPLETED' && loan.returnTime && (
                                         <div className="text-right">
                                             <p className="text-[9px] font-black text-slate-400 uppercase">Devolvido em</p>
@@ -522,7 +614,7 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                         {sortedLoans.length === 0 && (
                             <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                                 <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
-                                <p className="text-xs font-bold text-slate-400 uppercase">Nenhum registro encontrado</p>
+                                <p className="text-xs font-bold text-slate-400 uppercase">Nenhum histórico encontrado</p>
                             </div>
                         )}
                     </div>
