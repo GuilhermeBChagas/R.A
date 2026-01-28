@@ -1202,7 +1202,7 @@ export function App() {
                         {toolsMenuOpen && !isSidebarCollapsed && (
                              <div className="space-y-1 mt-1">
                                 {isMenuVisible('tool_appearance') && <NavItem label="Aparência" active={view === 'TOOLS'} onClick={() => handleNavigate('TOOLS')} collapsed={isSidebarCollapsed} isSubItem />}
-                                {isMenuVisible('tool_layout') && <NavItem label="Layout do Painel" active={view === 'LAYOUT_MANAGER'} onClick={() => handleNavigate('LAYOUT_MANAGER')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_layout') && <NavItem label="Dashboard (Layout)" active={view === 'LAYOUT_MANAGER'} onClick={() => handleNavigate('LAYOUT_MANAGER')} collapsed={isSidebarCollapsed} isSubItem />}
                                 {isMenuVisible('tool_import') && <NavItem label="Importação / Exportação" active={view === 'IMPORT_EXPORT'} onClick={() => handleNavigate('IMPORT_EXPORT')} collapsed={isSidebarCollapsed} isSubItem />}
                                 {isMenuVisible('tool_permissions') && <NavItem label="Permissões" active={view === 'PERMISSIONS_TOOLS'} onClick={() => handleNavigate('PERMISSIONS_TOOLS')} collapsed={isSidebarCollapsed} isSubItem />}
                                 {isMenuVisible('tool_logs') && <NavItem label="Log do sistema" active={view === 'LOGS'} onClick={() => handleNavigate('LOGS')} collapsed={isSidebarCollapsed} isSubItem />}

@@ -68,7 +68,7 @@ export const MENU_STRUCTURE: MenuItemDef[] = [
       },
       {
         id: 'tools_root', label: 'Ferramentas', children: [
-          { id: 'tool_layout', label: 'Layout do Painel' },
+          { id: 'tool_layout', label: 'Dashboard (Layout)' },
           { id: 'tool_appearance', label: 'Aparência' },
           { id: 'tool_import', label: 'Importação / Exportação' },
           { id: 'tool_permissions', label: 'Permissões' },
