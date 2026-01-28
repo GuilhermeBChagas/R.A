@@ -6,7 +6,7 @@ import {
   ArrowRightLeft, History, Plus, Search, User as UserIcon, 
   Car, Shield, Radio as RadioIcon, Package, CheckCircle, 
   XCircle, Clock, Calendar, ChevronRight, CornerDownLeft, 
-  AlertCircle, Loader2, Filter
+  AlertCircle, Loader2, Filter, Layers
 } from 'lucide-react';
 
 interface LoanViewsProps {
@@ -107,7 +107,6 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                   if (error) throw error;
 
                   onLogAction('LOAN_RETURN', `Recebeu devolução: ${loan.assetDescription}`);
-                  // Pequeno delay para garantir propagação no banco antes do refresh
                   setTimeout(() => onRefresh(), 200);
               } catch (err: any) {
                   console.error("Erro ao devolver:", err);
@@ -128,6 +127,28 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
       }
   };
 
+  // --- BATCH CONFIRMATION LOGIC ---
+  const handleConfirmBatch = (loansToConfirm: LoanRecord[]) => {
+      if (loansToConfirm.length === 0) return;
+      const receiverName = loansToConfirm[0].receiverName;
+      
+      onShowConfirm(
+          "Confirmar Lote",
+          `Confirma a entrega de ${loansToConfirm.length} itens para ${receiverName}?`,
+          async () => {
+              try {
+                  const ids = loansToConfirm.map(l => l.id);
+                  const { error } = await supabase.from('loan_records').update({ status: 'ACTIVE' }).in('id', ids);
+                  if (error) throw error;
+                  onLogAction('LOAN_CONFIRM', `Confirmou lote de ${loansToConfirm.length} itens para ${receiverName}`);
+                  onRefresh();
+              } catch (err: any) {
+                  alert('Erro ao confirmar lote: ' + err.message);
+              }
+          }
+      );
+  };
+
   const filteredLoans = loans.filter(l => {
       if (activeTab === 'HISTORY') return l.status === 'COMPLETED' || l.status === 'REJECTED';
       if (filterStatus === 'PENDING') return l.status === 'PENDING';
@@ -139,6 +160,23 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   );
   
   const sortedLoans = [...filteredLoans].sort((a, b) => new Date(b.checkoutTime).getTime() - new Date(a.checkoutTime).getTime());
+
+  // Agrupamento por Batch (Lote) para visualização de Pendentes
+  const groupedPendingLoans = useMemo(() => {
+      if (filterStatus !== 'PENDING') return null;
+      
+      const groups: Record<string, LoanRecord[]> = {};
+      sortedLoans.forEach(loan => {
+          // Usa batchId se existir, senão usa receiverId como fallback para agrupar por pessoa
+          const key = loan.batchId || loan.receiverId;
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(loan);
+      });
+
+      return Object.values(groups).sort((a, b) => 
+          new Date(b[0].checkoutTime).getTime() - new Date(a[0].checkoutTime).getTime()
+      );
+  }, [sortedLoans, filterStatus]);
 
   const toggleAsset = (type: string, id: string) => {
       if (selectedAssets.some(a => a.id === id)) {
@@ -162,6 +200,17 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   };
 
   const showTabs = !isReportView && filterStatus !== 'PENDING';
+
+  // Ícone helper
+  const getAssetIcon = (type: string) => {
+      switch(type) {
+          case 'VEHICLE': return <Car size={16} />;
+          case 'VEST': return <Shield size={16} />;
+          case 'RADIO': return <RadioIcon size={16} />;
+          case 'EQUIPMENT': return <Package size={16} />;
+          default: return <Package size={16} />;
+      }
+  };
 
   return (
       <div className="space-y-6 animate-fade-in">
@@ -353,67 +402,131 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                       />
                   </div>
 
-                  {/* List */}
-                  <div className="grid gap-3">
-                      {sortedLoans.map(loan => (
-                          <div key={loan.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                              <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-full ${loan.status === 'ACTIVE' ? 'bg-blue-50 text-blue-600' : loan.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : loan.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                                      {loan.assetType === 'VEHICLE' && <Car size={20} />}
-                                      {loan.assetType === 'VEST' && <Shield size={20} />}
-                                      {loan.assetType === 'RADIO' && <RadioIcon size={20} />}
-                                      {loan.assetType === 'EQUIPMENT' && <Package size={20} />}
-                                  </div>
-                                  <div>
-                                      <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase">{loan.assetDescription}</h4>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                                          <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
-                                              <UserIcon size={10} /> {loan.receiverName}
-                                          </span>
-                                          <span className="text-[10px] font-mono text-slate-400">
-                                              {new Date(loan.checkoutTime).toLocaleDateString()} {new Date(loan.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                          </span>
-                                          {loan.status === 'PENDING' && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black uppercase">Pendente</span>}
-                                          {loan.status === 'COMPLETED' && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-black uppercase">Devolvido</span>}
-                                      </div>
-                                  </div>
-                              </div>
-                              
-                              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                                  {loan.status === 'PENDING' && (
-                                      <button 
-                                        onClick={() => handleConfirm(loan)}
-                                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-700 transition-colors flex items-center gap-1"
-                                      >
-                                          <CheckCircle size={12} /> Confirmar
-                                      </button>
-                                  )}
-                                  {loan.status === 'ACTIVE' && (
-                                      <button 
-                                        onClick={() => handleReturn(loan)}
-                                        className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase hover:bg-slate-700 transition-colors flex items-center gap-1"
-                                      >
-                                          <CornerDownLeft size={12} /> Devolver
-                                      </button>
-                                  )}
-                                  {loan.status === 'COMPLETED' && loan.returnTime && (
-                                      <div className="text-right">
-                                          <p className="text-[9px] font-black text-slate-400 uppercase">Devolvido em</p>
-                                          <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300">
-                                              {new Date(loan.returnTime).toLocaleDateString()} {new Date(loan.returnTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                          </p>
-                                      </div>
-                                  )}
-                              </div>
-                          </div>
-                      ))}
-                      {sortedLoans.length === 0 && (
-                          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                              <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
-                              <p className="text-xs font-bold text-slate-400 uppercase">Nenhum registro encontrado</p>
-                          </div>
-                      )}
-                  </div>
+                  {/* LOGIC FOR PENDING GROUPING */}
+                  {filterStatus === 'PENDING' && groupedPendingLoans ? (
+                       <div className="grid gap-4">
+                           {groupedPendingLoans.map((batch, index) => {
+                               const firstLoan = batch[0];
+                               return (
+                                   <div key={index} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden animate-in slide-in-from-bottom-2">
+                                       {/* Batch Header */}
+                                       <div className="bg-slate-50 dark:bg-slate-800 p-4 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                                           <div>
+                                               <div className="flex items-center gap-2 mb-1">
+                                                    <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1">
+                                                        <Clock size={12} /> Pendente
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-slate-400">
+                                                        {new Date(firstLoan.checkoutTime).toLocaleDateString()} {new Date(firstLoan.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                    </span>
+                                               </div>
+                                               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase flex items-center gap-2">
+                                                   <UserIcon size={16} className="text-blue-500" /> {firstLoan.receiverName}
+                                               </h3>
+                                               <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5 pl-6">{batch.length} Itens neste lote</p>
+                                           </div>
+                                           <div className="w-full md:w-auto">
+                                                <button 
+                                                    onClick={() => handleConfirmBatch(batch)}
+                                                    className="w-full md:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95"
+                                                >
+                                                    <CheckCircle size={14} /> Confirmar Todos ({batch.length})
+                                                </button>
+                                           </div>
+                                       </div>
+
+                                       {/* Batch Items */}
+                                       <div className="p-2 space-y-1">
+                                           {batch.map(loan => (
+                                               <div key={loan.id} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
+                                                   <div className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg">
+                                                       {getAssetIcon(loan.assetType)}
+                                                   </div>
+                                                   <div className="flex-1">
+                                                       <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">{loan.assetDescription}</p>
+                                                       <p className="text-[9px] font-bold text-slate-400 uppercase">{loan.assetType === 'VEHICLE' ? 'Veículo' : loan.assetType === 'VEST' ? 'Colete' : loan.assetType === 'RADIO' ? 'Rádio' : 'Equipamento'}</p>
+                                                   </div>
+                                                   {/* Individual confirm button (optional but useful) */}
+                                                   <button 
+                                                        onClick={() => handleConfirm(loan)}
+                                                        className="p-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                                                        title="Confirmar apenas este item"
+                                                   >
+                                                       <CheckCircle size={16} />
+                                                   </button>
+                                               </div>
+                                           ))}
+                                       </div>
+                                   </div>
+                               );
+                           })}
+                           {groupedPendingLoans.length === 0 && (
+                                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                    <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
+                                    <p className="text-xs font-bold text-slate-400 uppercase">Nenhuma entrega pendente de confirmação</p>
+                                </div>
+                           )}
+                       </div>
+                  ) : (
+                    /* LIST FOR ACTIVE / HISTORY (FLAT LIST) */
+                    <div className="grid gap-3">
+                        {sortedLoans.map(loan => (
+                            <div key={loan.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div className="flex items-start gap-4">
+                                    <div className={`p-3 rounded-full ${loan.status === 'ACTIVE' ? 'bg-blue-50 text-blue-600' : loan.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : loan.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                                        {getAssetIcon(loan.assetType)}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 uppercase">{loan.assetDescription}</h4>
+                                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                                <UserIcon size={10} /> {loan.receiverName}
+                                            </span>
+                                            <span className="text-[10px] font-mono text-slate-400">
+                                                {new Date(loan.checkoutTime).toLocaleDateString()} {new Date(loan.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </span>
+                                            {loan.status === 'PENDING' && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black uppercase">Pendente</span>}
+                                            {loan.status === 'COMPLETED' && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-black uppercase">Devolvido</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                                    {loan.status === 'PENDING' && (
+                                        <button 
+                                            onClick={() => handleConfirm(loan)}
+                                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase hover:bg-emerald-700 transition-colors flex items-center gap-1"
+                                        >
+                                            <CheckCircle size={12} /> Confirmar
+                                        </button>
+                                    )}
+                                    {loan.status === 'ACTIVE' && (
+                                        <button 
+                                            onClick={() => handleReturn(loan)}
+                                            className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase hover:bg-slate-700 transition-colors flex items-center gap-1"
+                                        >
+                                            <CornerDownLeft size={12} /> Devolver
+                                        </button>
+                                    )}
+                                    {loan.status === 'COMPLETED' && loan.returnTime && (
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase">Devolvido em</p>
+                                            <p className="text-[10px] font-mono text-slate-600 dark:text-slate-300">
+                                                {new Date(loan.returnTime).toLocaleDateString()} {new Date(loan.returnTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {sortedLoans.length === 0 && (
+                            <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                <AlertCircle size={32} className="mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-bold text-slate-400 uppercase">Nenhum registro encontrado</p>
+                            </div>
+                        )}
+                    </div>
+                  )}
                   
                   {hasMore && (
                       <div className="text-center pt-4">
