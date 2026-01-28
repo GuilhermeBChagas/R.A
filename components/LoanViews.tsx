@@ -24,13 +24,15 @@ interface LoanViewsProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
-  filterStatus?: 'ACTIVE' | 'PENDING'; // New prop for strict filtering
+  filterStatus?: 'ACTIVE' | 'PENDING';
+  onShowConfirm: (title: string, message: string, onConfirm: () => void) => void;
 }
 
 export const LoanViews: React.FC<LoanViewsProps> = ({ 
   currentUser, users, vehicles, vests, radios, equipments, onLogAction,
   loans, onRefresh, initialTab = 'ACTIVE', isReportView = false,
-  hasMore = false, isLoadingMore = false, onLoadMore, filterStatus
+  hasMore = false, isLoadingMore = false, onLoadMore, filterStatus,
+  onShowConfirm
 }) => {
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY' | 'NEW'>(initialTab === 'HISTORY' ? 'HISTORY' : 'ACTIVE');
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,8 +49,6 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   
   const availableRadios = useMemo(() => radios.filter(r => !loans.some(l => l.assetId === r.id && (l.status === 'ACTIVE' || l.status === 'PENDING'))), [radios, loans]);
   
-  // Equipments usually don't track unique ID per item in simple schemas, but we allow selection anyway
-  
   const handleCreateLoan = async () => {
       if (!receiverId || selectedAssets.length === 0) return alert("Selecione um recebedor e ao menos um item.");
       
@@ -64,15 +64,15 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
           else if (asset.type === 'EQUIPMENT') { const e = equipments.find(x => x.id === asset.id); description = `${e?.name}`; }
 
           return {
-              batchId,
-              operatorId: currentUser.id,
-              receiverId,
-              receiverName: receiver?.name || 'Desconhecido',
-              assetType: asset.type,
-              assetId: asset.id,
-              assetDescription: description,
-              checkoutTime: new Date().toISOString(),
-              status: 'PENDING' // Starts as Pending
+              batch_id: batchId,
+              operator_id: currentUser.id,
+              receiver_id: receiverId,
+              receiver_name: receiver?.name || 'Desconhecido',
+              asset_type: asset.type,
+              item_id: asset.id, 
+              description: description, 
+              checkout_time: new Date().toISOString(),
+              status: 'PENDING' 
           };
       });
 
@@ -86,26 +86,35 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
           setSelectedAssets([]);
           onRefresh();
       } catch (err: any) {
+          console.error("Erro insert loan:", err);
           alert('Erro ao criar cautela: ' + err.message);
       } finally {
           setIsSubmitting(false);
       }
   };
 
-  const handleReturn = async (loan: LoanRecord) => {
-      if (!confirm("Confirmar devolução deste item?")) return;
-      try {
-          const { error } = await supabase.from('loan_records').update({
-              status: 'COMPLETED',
-              returnTime: new Date().toISOString()
-          }).eq('id', loan.id);
-          
-          if (error) throw error;
-          onLogAction('LOAN_RETURN', `Recebeu devolução: ${loan.assetDescription}`);
-          onRefresh();
-      } catch (err: any) {
-          alert('Erro: ' + err.message);
-      }
+  const handleReturn = (loan: LoanRecord) => {
+      onShowConfirm(
+          "Confirmar Devolução", 
+          `Deseja confirmar a devolução do item: ${loan.assetDescription}?`, 
+          async () => {
+              try {
+                  const { error } = await supabase.from('loan_records').update({
+                      status: 'COMPLETED',
+                      return_time: new Date().toISOString()
+                  }).eq('id', loan.id);
+                  
+                  if (error) throw error;
+
+                  onLogAction('LOAN_RETURN', `Recebeu devolução: ${loan.assetDescription}`);
+                  // Pequeno delay para garantir propagação no banco antes do refresh
+                  setTimeout(() => onRefresh(), 200);
+              } catch (err: any) {
+                  console.error("Erro ao devolver:", err);
+                  alert('Erro ao processar devolução: ' + (err.message || JSON.stringify(err)));
+              }
+          }
+      );
   };
 
   const handleConfirm = async (loan: LoanRecord) => {
@@ -120,14 +129,9 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   };
 
   const filteredLoans = loans.filter(l => {
-      // 1. History View (Always takes precedence)
       if (activeTab === 'HISTORY') return l.status === 'COMPLETED' || l.status === 'REJECTED';
-      
-      // 2. Strict Filtering (for separate menus)
       if (filterStatus === 'PENDING') return l.status === 'PENDING';
       if (filterStatus === 'ACTIVE') return l.status === 'ACTIVE';
-
-      // 3. Default Mixed View (fallback)
       return l.status === 'ACTIVE' || l.status === 'PENDING';
   }).filter(l => 
       l.receiverName.toLowerCase().includes(searchTerm.toLowerCase()) ||

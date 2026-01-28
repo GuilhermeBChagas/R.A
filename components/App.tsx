@@ -64,6 +64,19 @@ const mapIncident = (db: any): Incident => ({
     status: (db.status || 'PENDING').toUpperCase()
 });
 
+const mapLoan = (l: any): LoanRecord => ({
+  ...l,
+  batchId: l.batch_id || l.batchId,
+  operatorId: l.operator_id || l.operatorId,
+  receiverId: l.receiver_id || l.receiverId,
+  receiverName: l.receiver_name || l.receiverName,
+  assetType: l.asset_type || l.item_type || l.assetType, // Added item_type fallback
+  assetId: l.asset_id || l.item_id || l.assetId, // Added item_id fallback
+  assetDescription: l.asset_description || l.description || l.assetDescription, // Mapped to support both column names
+  checkoutTime: l.checkout_time || l.checkoutTime,
+  returnTime: l.return_time || l.returnTime,
+});
+
 // --- INLINE COMPONENTS DEFINITIONS ---
 
 interface NavItemProps {
@@ -580,16 +593,18 @@ export function App() {
         if (!isLoadMore) {
             const [activeRes, completedRes] = await Promise.all([
                 supabase.from('loan_records').select('*').in('status', ['PENDING', 'ACTIVE']),
-                supabase.from('loan_records').select('*').in('status', ['COMPLETED', 'REJECTED']).order('checkoutTime', { ascending: false }).range(0, PAGE_SIZE - 1)
+                supabase.from('loan_records').select('*').in('status', ['COMPLETED', 'REJECTED']).order('checkout_time', { ascending: false }).range(0, PAGE_SIZE - 1)
             ]);
             if (activeRes.error) throw activeRes.error;
             if (completedRes.error) throw completedRes.error;
-            finalData = [...(activeRes.data || []), ...(completedRes.data || [])];
+            const mappedActive = (activeRes.data || []).map(mapLoan);
+            const mappedCompleted = (completedRes.data || []).map(mapLoan);
+            finalData = [...mappedActive, ...mappedCompleted];
             if ((completedRes.data?.length || 0) < PAGE_SIZE) setHasMoreLoans(false);
         } else {
-            const { data, error } = await supabase.from('loan_records').select('*').in('status', ['COMPLETED', 'REJECTED']).order('checkoutTime', { ascending: false }).range(from, to);
+            const { data, error } = await supabase.from('loan_records').select('*').in('status', ['COMPLETED', 'REJECTED']).order('checkout_time', { ascending: false }).range(from, to);
             if (error) throw error;
-            finalData = data || [];
+            finalData = (data || []).map(mapLoan);
             if (finalData.length < PAGE_SIZE) setHasMoreLoans(false);
             setLoanPage(currentPage);
         }
@@ -1034,6 +1049,7 @@ export function App() {
                             onRefresh={() => fetchLoans(false)} 
                             initialTab="ACTIVE"
                             filterStatus="PENDING"
+                            onShowConfirm={showConfirm}
                         />
                     )}
                 </div>
@@ -1051,8 +1067,8 @@ export function App() {
       case 'RADIO_FORM': return <RadioForm initialData={editingRadio} onSave={(i: any) => handleSaveAsset('radios', i, 'RADIOS', 'Rádio')} onCancel={() => handleNavigate('RADIOS')} onDelete={() => editingRadio && handleDeleteAsset('radios', editingRadio.id, 'Rádio')} />;
       case 'EQUIPMENTS': return <EquipmentList items={equipments} onAdd={() => { setEditingEquipment(null); handleNavigate('EQUIPMENT_FORM'); }} onEdit={(i) => { setEditingEquipment(i); handleNavigate('EQUIPMENT_FORM'); }} onDelete={(id) => handleDeleteAsset('equipments', id, 'Equipamento')} />;
       case 'EQUIPMENT_FORM': return <EquipmentForm initialData={editingEquipment} onSave={(i: any) => handleSaveAsset('equipments', i, 'EQUIPMENTS', 'Equipamento')} onCancel={() => handleNavigate('EQUIPMENTS')} onDelete={() => editingEquipment && handleDeleteAsset('equipments', editingEquipment.id, 'Equipamento')} />;
-      case 'LOANS': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} loans={loans} onRefresh={() => fetchLoans(false)} filterStatus="ACTIVE" />;
-      case 'LOAN_HISTORY': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} initialTab="HISTORY" isReportView={true} loans={loans} onRefresh={() => fetchLoans(false)} hasMore={hasMoreLoans} isLoadingMore={loadingMoreLoans} onLoadMore={() => fetchLoans(true)} />;
+      case 'LOANS': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} loans={loans} onRefresh={() => fetchLoans(false)} filterStatus="ACTIVE" onShowConfirm={showConfirm} />;
+      case 'LOAN_HISTORY': return <LoanViews currentUser={user!} users={users} vehicles={vehicles} vests={vests} radios={radios} equipments={equipments} onLogAction={createLog} initialTab="HISTORY" isReportView={true} loans={loans} onRefresh={() => fetchLoans(false)} hasMore={hasMoreLoans} isLoadingMore={loadingMoreLoans} onLoadMore={() => fetchLoans(true)} onShowConfirm={showConfirm} />;
       case 'SECTORS': return <SectorList sectors={sectors} onEdit={(s) => { setEditingSector(s); handleNavigate('SECTOR_FORM'); }} onDelete={handleDeleteSector} onAdd={() => { setEditingSector(null); handleNavigate('SECTOR_FORM'); }} />;
       case 'SECTOR_FORM': return <SectorForm initialData={editingSector} onSave={handleSaveSector} onCancel={() => handleNavigate('SECTORS')} onDelete={handleDeleteSector} />;
       case 'ALTERATION_TYPES': return <AlterationTypeManager types={alterationTypes} onAdd={async (name) => { const newType = { id: crypto.randomUUID(), name, order: alterationTypes.length }; await handleSaveAlterationType(newType); }} onEdit={(t) => { setEditingAlterationType(t); setView('ALTERATION_TYPE_FORM'); }} onDelete={handleDeleteAlterationType} onReorder={handleReorderAlterationTypes} />;
