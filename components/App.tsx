@@ -42,7 +42,9 @@ const DEFAULT_PERMISSIONS: SystemPermissionMap = {
   RETURN_LOANS: [UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.OPERATOR],
   MANAGE_USERS: [UserRole.ADMIN],
   DELETE_USERS: [UserRole.ADMIN],
-  MANAGE_SETTINGS: [UserRole.ADMIN, UserRole.SUPERVISOR],
+  MANAGE_BUILDINGS: [UserRole.ADMIN, UserRole.SUPERVISOR],
+  MANAGE_SECTORS: [UserRole.ADMIN, UserRole.SUPERVISOR],
+  MANAGE_ALTERATION_TYPES: [UserRole.ADMIN, UserRole.SUPERVISOR],
   ACCESS_TOOLS: [UserRole.ADMIN],
   EXPORT_REPORTS: [UserRole.ADMIN, UserRole.SUPERVISOR]
 };
@@ -780,12 +782,14 @@ export function App() {
   const handleNavigate = (newView: ViewState) => { setView(newView); setSidebarOpen(false); };
 
   const handleDeleteSector = (id: string) => {
+      if (!can('MANAGE_SECTORS')) return showError('Acesso Negado', 'Sem permissão.');
       showConfirm("Remover Setor", "Deseja realmente remover este setor?", async () => {
           try { await supabase.from('sectors').delete().eq('id', id); fetchStaticData(); handleNavigate('SECTORS'); } catch (err: any) { showError("Erro", err.message); }
       });
   };
 
   const handleDeleteAlterationType = (id: string) => {
+      if (!can('MANAGE_ALTERATION_TYPES')) return showError('Acesso Negado', 'Sem permissão.');
       showConfirm("Remover Tipo", "Deseja realmente remover este tipo de alteração?", async () => {
           try { await supabase.from('alteration_types').delete().eq('id', id); fetchStaticData(); handleNavigate('ALTERATION_TYPES'); } catch (err: any) { showError("Erro", err.message); }
       });
@@ -960,7 +964,7 @@ export function App() {
   };
 
   const handleDeleteBuilding = (id: string) => {
-      if (!can('MANAGE_SETTINGS')) return showError('Acesso Negado', 'Sem permissão.');
+      if (!can('MANAGE_BUILDINGS')) return showError('Acesso Negado', 'Sem permissão.');
       showConfirm("Remover Prédio", "Deseja excluir esta unidade?", async () => {
           try { await supabase.from('buildings').delete().eq('id', id); fetchStaticData(); } catch (any) { showError("Erro", "Falha ao remover."); }
       });
@@ -1055,7 +1059,7 @@ export function App() {
                 </div>
             </div>
         );
-      case 'BUILDINGS': return <BuildingList buildings={buildings} sectors={sectors} onEdit={(b) => { setEditingBuilding(b); handleNavigate('BUILDING_FORM'); }} onDelete={handleDeleteBuilding} onAdd={() => { setEditingBuilding(null); handleNavigate('BUILDING_FORM'); }} onRefresh={fetchStaticData} canEdit={can('MANAGE_SETTINGS')} canDelete={can('MANAGE_SETTINGS')} />;
+      case 'BUILDINGS': return <BuildingList buildings={buildings} sectors={sectors} onEdit={(b) => { setEditingBuilding(b); handleNavigate('BUILDING_FORM'); }} onDelete={handleDeleteBuilding} onAdd={() => { setEditingBuilding(null); handleNavigate('BUILDING_FORM'); }} onRefresh={fetchStaticData} canEdit={can('MANAGE_BUILDINGS')} canDelete={can('MANAGE_BUILDINGS')} />;
       case 'BUILDING_FORM': return <BuildingForm initialData={editingBuilding} sectors={sectors} onSave={async (b) => { await supabase.from('buildings').upsert(b); fetchStaticData(); handleNavigate('BUILDINGS'); }} onCancel={() => handleNavigate('BUILDINGS')} onDelete={handleDeleteBuilding} />;
       case 'USERS': return <UserList users={users} onEdit={(u) => { setEditingUser(u); handleNavigate('USER_FORM'); }} onDelete={handleDeleteUser} onAdd={() => { setEditingUser(null); handleNavigate('USER_FORM'); }} onRefresh={fetchUsers} canEdit={can('MANAGE_USERS')} canDelete={can('DELETE_USERS')} />;
       case 'USER_FORM': return <UserForm initialData={editingUser} onSave={async (u) => { const { userCode, ...rest } = u; await supabase.from('users').upsert({ ...rest, user_code: userCode }); fetchUsers(); handleNavigate('USERS'); }} onCancel={() => handleNavigate('USERS')} onDelete={handleDeleteUser} />;
@@ -1132,7 +1136,7 @@ export function App() {
                 
                 <NavItem icon={<PieChartIcon />} label="Estatísticas" active={view === 'CHARTS'} onClick={() => handleNavigate('CHARTS')} collapsed={isSidebarCollapsed} />
             </div>
-            {(can('MANAGE_ASSETS') || can('MANAGE_USERS') || can('MANAGE_SETTINGS')) && (
+            {(can('MANAGE_ASSETS') || can('MANAGE_USERS') || can('MANAGE_BUILDINGS') || can('MANAGE_SECTORS') || can('MANAGE_ALTERATION_TYPES')) && (
                 <div className="pt-4 pb-2 border-t border-brand-800">
                     {!isSidebarCollapsed && <p className="px-3 text-[10px] font-bold text-brand-300 mb-2 uppercase tracking-widest">Administração</p>}
                     <div className="relative">
@@ -1141,12 +1145,14 @@ export function App() {
                     </div>
                     {registrationsMenuOpen && !isSidebarCollapsed && (
                          <div className="space-y-1 mt-1">
-                            {can('MANAGE_SETTINGS') && (
-                              <>
+                            {can('MANAGE_BUILDINGS') && (
                                 <NavItem label="Próprios" icon={<BuildingIcon size={14} className="mr-2"/>} active={view === 'BUILDINGS' || view === 'BUILDING_FORM'} onClick={() => handleNavigate('BUILDINGS')} collapsed={isSidebarCollapsed} isSubItem />
+                            )}
+                            {can('MANAGE_ALTERATION_TYPES') && (
                                 <NavItem label="Tipos de Alteração" icon={<Tag size={14} className="mr-2"/>} active={view === 'ALTERATION_TYPES' || view === 'ALTERATION_TYPE_FORM'} onClick={() => handleNavigate('ALTERATION_TYPES')} collapsed={isSidebarCollapsed} isSubItem />
+                            )}
+                            {can('MANAGE_SECTORS') && (
                                 <NavItem label="Setores" icon={<Map size={14} className="mr-2"/>} active={view === 'SECTORS' || view === 'SECTOR_FORM'} onClick={() => handleNavigate('SECTORS')} collapsed={isSidebarCollapsed} isSubItem />
-                              </>
                             )}
                             {can('MANAGE_USERS') && <NavItem label="Usuários" icon={<Users size={14} className="mr-2"/>} active={view === 'USERS' || view === 'USER_FORM'} onClick={() => handleNavigate('USERS')} collapsed={isSidebarCollapsed} isSubItem />}
                             {can('MANAGE_ASSETS') && (

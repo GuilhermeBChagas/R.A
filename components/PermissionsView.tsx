@@ -13,32 +13,34 @@ interface PermissionsViewProps {
 
 const PERMISSION_GROUPS = [
   {
-    category: 'Ocorrências e R.A',
+    category: 'REGISTROS',
     items: [
-      { key: 'CREATE_INCIDENT', label: 'Criar Novo Registro' },
-      { key: 'VIEW_ALL_INCIDENTS', label: 'Ver Histórico Completo / Relatórios' },
-      { key: 'EDIT_INCIDENT', label: 'Editar Registros Existentes' },
-      { key: 'APPROVE_INCIDENT', label: 'Validar/Aprovar Ocorrências' },
-      { key: 'DELETE_INCIDENT', label: 'Excluir/Cancelar Registros' },
+      { key: 'CREATE_INCIDENT', label: 'CRIAR NOVO REGISTRO' },
+      { key: 'VIEW_ALL_INCIDENTS', label: 'VER HISTÓRICO DE REGISTROS' },
+      { key: 'EDIT_INCIDENT', label: 'EDITAR REGISTROS EXISTENTES' },
+      { key: 'APPROVE_INCIDENT', label: 'VALIDAR/APROVAR REGISTROS' },
+      { key: 'DELETE_INCIDENT', label: 'EXCLUIR/CANCELAR REGISTROS' },
     ]
   },
   {
-    category: 'Ativos e Patrimônio',
+    category: 'CAUTELAS',
     items: [
-      { key: 'MANAGE_ASSETS', label: 'Gerenciar (Criar/Editar) Ativos' },
-      { key: 'DELETE_ASSETS', label: 'Excluir Ativos' },
-      { key: 'MANAGE_LOANS', label: 'Gerenciar Cautelas' },
-      { key: 'RETURN_LOANS', label: 'Realizar Devoluções' },
+      { key: 'MANAGE_ASSETS', label: 'GERENCIAR CAUTELAS (CRIAR/EDITAR)' },
+      { key: 'DELETE_ASSETS', label: 'EXCLUIR CAUTELAS' },
+      { key: 'MANAGE_LOANS', label: 'GERENCIAR CAUTELAS' },
+      { key: 'RETURN_LOANS', label: 'REALIZAR DEVOLUÇÕES' },
     ]
   },
   {
-    category: 'Administração',
+    category: 'ADMINISTRAÇÃO',
     items: [
-      { key: 'MANAGE_USERS', label: 'Gerenciar Usuários' },
-      { key: 'DELETE_USERS', label: 'Excluir Usuários' },
-      { key: 'MANAGE_SETTINGS', label: 'Gerenciar Prédios/Setores/Tipos' },
-      { key: 'ACCESS_TOOLS', label: 'Acesso a Ferramentas/Logs' },
-      { key: 'EXPORT_REPORTS', label: 'Exportar PDF/Excel' },
+      { key: 'MANAGE_USERS', label: 'GERENCIAR USUÁRIOS' },
+      { key: 'DELETE_USERS', label: 'EXCLUIR USUÁRIOS' },
+      { key: 'MANAGE_BUILDINGS', label: 'GERENCIAR PRÉDIOS' },
+      { key: 'MANAGE_SECTORS', label: 'GERENCIAR SETORES' },
+      { key: 'MANAGE_ALTERATION_TYPES', label: 'GERENCIAR TIPOS DE ALTERAÇÃO' },
+      { key: 'ACCESS_TOOLS', label: 'ACESSO A FERRAMENTAS/LOGS' },
+      { key: 'EXPORT_REPORTS', label: 'EXPORTAR PDF/EXCEL' },
     ]
   }
 ];

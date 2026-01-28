@@ -20,7 +20,9 @@ export type PermissionKey =
   | 'RETURN_LOANS'       // Realizar Devolução
   | 'MANAGE_USERS'       // Criar/Editar Usuários
   | 'DELETE_USERS'
-  | 'MANAGE_SETTINGS'    // Setores, Tipos de Alteração
+  | 'MANAGE_BUILDINGS'   // Gerenciar Prédios
+  | 'MANAGE_SECTORS'     // Gerenciar Setores
+  | 'MANAGE_ALTERATION_TYPES' // Gerenciar Tipos de Alteração
   | 'ACCESS_TOOLS'       // Logs, Backup, Config Visual, Permissões
   | 'EXPORT_REPORTS';
 
