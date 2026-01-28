@@ -167,13 +167,13 @@ export const ToolsView: React.FC<ToolsViewProps> = ({
             {activeTab === 'PERMISSIONS' && <><Key className="text-blue-600" /> Permissões de Acesso</>}
             {activeTab === 'IMPORT_EXPORT' && <><FileSpreadsheet className="text-emerald-600" /> Dados (Excel)</>}
             {activeTab === 'SYSTEM' && <><Info className="text-purple-600" /> Sobre o Sistema</>}
-            {activeTab === 'LAYOUT_MANAGER' && <><Layout className="text-blue-600" /> Dashboard (Layout)</>}
+            {activeTab === 'LAYOUT_MANAGER' && <><Layout className="text-blue-600" /> Layout do Painel</>}
         </h2>
         
         {/* Navigation Tabs (Simples) */}
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
              <button onClick={() => setActiveTab('APPEARANCE')} className={`p-2 rounded-lg ${activeTab === 'APPEARANCE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Aparência"><Settings size={20}/></button>
-             <button onClick={() => setActiveTab('LAYOUT_MANAGER')} className={`p-2 rounded-lg ${activeTab === 'LAYOUT_MANAGER' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Dashboard (Layout)"><Layout size={20}/></button>
+             <button onClick={() => setActiveTab('LAYOUT_MANAGER')} className={`p-2 rounded-lg ${activeTab === 'LAYOUT_MANAGER' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Layout do Painel"><Layout size={20}/></button>
              <button onClick={() => setActiveTab('PERMISSIONS')} className={`p-2 rounded-lg ${activeTab === 'PERMISSIONS' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Permissões"><Key size={20}/></button>
              <button onClick={() => setActiveTab('LOGS')} className={`p-2 rounded-lg ${activeTab === 'LOGS' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Logs"><History size={20}/></button>
              <button onClick={() => setActiveTab('IMPORT_EXPORT')} className={`p-2 rounded-lg ${activeTab === 'IMPORT_EXPORT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`} title="Importar/Exportar"><FileSpreadsheet size={20}/></button>
