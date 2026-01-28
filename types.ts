@@ -106,6 +106,7 @@ export interface Vehicle {
   fleetNumber: string;   // Numero de Frota
   fuelType: string;      // Combustível
   department: string;    // Secretaria
+  currentKm?: number;    // Quilometragem Atual
 }
 
 export interface Vest {

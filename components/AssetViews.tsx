@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Vehicle, Vest, Radio, Equipment } from '../types';
-import { Plus, Pencil, Trash2, Search, Save, X, Car, Shield, Radio as RadioIcon, Package, Fuel, AlertCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Save, X, Car, Shield, Radio as RadioIcon, Package, Fuel, AlertCircle, Gauge } from 'lucide-react';
 
 // --- STYLES & UTILS (MATCHING BUILDING FORM) ---
 const inputClass = "block w-full rounded-md border-slate-300 dark:border-slate-600 shadow-sm border p-3 bg-white dark:bg-slate-800 dark:text-white font-bold outline-none focus:ring-2 focus:ring-blue-500 uppercase transition-all text-xs md:text-sm";
@@ -98,7 +98,7 @@ export const VehicleList: React.FC<{ items: Vehicle[], onAdd: () => void, onEdit
                             <th className="px-6 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Identificação</th>
                             <th className="px-6 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Modelo</th>
                             <th className="px-6 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Detalhes</th>
-                            <th className="px-6 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Secretaria</th>
+                            <th className="px-6 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">KM Atual</th>
                             <th className="px-6 py-3 text-right text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
                         </tr>
                     </thead>
@@ -118,7 +118,10 @@ export const VehicleList: React.FC<{ items: Vehicle[], onAdd: () => void, onEdit
                                         <span className="text-[10px] text-slate-400 uppercase flex items-center gap-1"><Fuel size={10} /> {i.fuelType}</span>
                                     </div>
                                 </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-[10px] text-slate-500 uppercase font-bold">{i.department}</td>
+                                <td className="px-6 py-3 whitespace-nowrap text-xs font-mono font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                    <Gauge size={14} className="text-slate-400" />
+                                    {i.currentKm ? i.currentKm.toLocaleString('pt-BR') : '---'}
+                                </td>
                                 <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex justify-end gap-2">
                                         <button onClick={() => onEdit(i)} className="text-blue-600 hover:text-blue-900 dark:hover:text-blue-400"><Pencil size={14} /></button>
@@ -140,7 +143,10 @@ export const VehicleList: React.FC<{ items: Vehicle[], onAdd: () => void, onEdit
                                 <span className="text-[10px] font-black text-slate-500 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded">{i.plate}</span>
                             </div>
                             <h3 className="font-bold text-slate-800 dark:text-slate-100 uppercase text-xs">{i.model}</h3>
-                            <p className="text-[10px] text-slate-500 uppercase mt-0.5">Frota: {i.fleetNumber} • {i.fuelType}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-slate-500 uppercase">{i.fuelType}</span>
+                                <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono"><Gauge size={10}/> {i.currentKm ? i.currentKm.toLocaleString('pt-BR') : '---'} KM</span>
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => onEdit(i)} className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg"><Pencil size={14} /></button>
@@ -155,7 +161,7 @@ export const VehicleList: React.FC<{ items: Vehicle[], onAdd: () => void, onEdit
 };
 
 export const VehicleForm: React.FC<any> = ({ initialData, onSave, onCancel, onDelete }) => {
-    const [data, setData] = useState<Vehicle>(initialData || { id: '', model: '', plate: '', prefix: '', fleetNumber: '', fuelType: '', department: '' });
+    const [data, setData] = useState<Vehicle>(initialData || { id: '', model: '', plate: '', prefix: '', fleetNumber: '', fuelType: '', department: '', currentKm: 0 });
 
     const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let value = e.target.value.toUpperCase();
@@ -210,6 +216,14 @@ export const VehicleForm: React.FC<any> = ({ initialData, onSave, onCancel, onDe
                             <option value="Elétrico">Elétrico</option>
                         </select>
                         <Fuel className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={16} />
+                    </div>
+                </div>
+
+                <div>
+                    <label className={labelClass}>Quilometragem Atual (KM)</label>
+                    <div className="relative">
+                        <input type="number" className={inputClass} value={data.currentKm || ''} onChange={e => setData({...data, currentKm: parseInt(e.target.value) || 0})} placeholder="0" min="0" />
+                        <Gauge className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" size={16} />
                     </div>
                 </div>
 

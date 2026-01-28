@@ -6,8 +6,9 @@ import {
   ArrowRightLeft, History, Plus, Search, User as UserIcon, 
   Car, Shield, Radio as RadioIcon, Package, CheckCircle, 
   XCircle, Clock, Calendar, ChevronRight, CornerDownLeft, 
-  AlertCircle, Loader2, Filter, Layers
+  AlertCircle, Loader2, Filter, Layers, Gauge, Fuel, DollarSign, Droplet
 } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface LoanViewsProps {
   currentUser: User;
@@ -42,6 +43,22 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   const [selectedAssets, setSelectedAssets] = useState<{type: string, id: string}[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // States for Vehicle Mileage Modals
+  const [showVehicleStartModal, setShowVehicleStartModal] = useState(false);
+  const [vehicleStartData, setVehicleStartData] = useState<{ id: string, model: string, currentKm: number, manualKm: number } | null>(null);
+
+  const [showVehicleReturnModal, setShowVehicleReturnModal] = useState(false);
+  const [vehicleReturnData, setVehicleReturnData] = useState<{ 
+      loanId: string, 
+      vehicleId: string, 
+      model: string, 
+      kmStart: number, 
+      kmEnd: number,
+      refuel: boolean,
+      fuelLiters: string,
+      fuelType: string
+  } | null>(null);
+
   // Filter lists for Form
   const availableVehicles = useMemo(() => vehicles.filter(v => !loans.some(l => l.assetId === v.id && (l.status === 'ACTIVE' || l.status === 'PENDING'))), [vehicles, loans]);
   
@@ -52,13 +69,41 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   const handleCreateLoan = async () => {
       if (!receiverId || selectedAssets.length === 0) return alert("Selecione um recebedor e ao menos um item.");
       
+      // Check for Vehicles to confirm mileage
+      const vehicleAsset = selectedAssets.find(a => a.type === 'VEHICLE');
+      if (vehicleAsset) {
+          const vehicle = vehicles.find(v => v.id === vehicleAsset.id);
+          if (vehicle) {
+              setVehicleStartData({
+                  id: vehicle.id,
+                  model: `${vehicle.model} (${vehicle.plate})`,
+                  currentKm: vehicle.currentKm || 0,
+                  manualKm: vehicle.currentKm || 0
+              });
+              setShowVehicleStartModal(true);
+              return; // Stop here, wait for modal confirmation
+          }
+      }
+
+      await processLoanCreation();
+  };
+
+  const processLoanCreation = async (startKmOverride?: number) => {
       setIsSubmitting(true);
       const batchId = crypto.randomUUID();
       const receiver = users.find(u => u.id === receiverId);
       
       const newLoans = selectedAssets.map(asset => {
           let description = '';
-          if (asset.type === 'VEHICLE') { const v = vehicles.find(x => x.id === asset.id); description = `${v?.model} (${v?.plate})`; }
+          let meta = {};
+
+          if (asset.type === 'VEHICLE') { 
+              const v = vehicles.find(x => x.id === asset.id); 
+              description = `${v?.model} (${v?.plate})`;
+              if (startKmOverride !== undefined) {
+                  meta = { kmStart: startKmOverride };
+              }
+          }
           else if (asset.type === 'VEST') { const v = vests.find(x => x.id === asset.id); description = `Colete ${v?.number} (${v?.size})`; }
           else if (asset.type === 'RADIO') { const r = radios.find(x => x.id === asset.id); description = `HT ${r?.number} - ${r?.serialNumber}`; }
           else if (asset.type === 'EQUIPMENT') { const e = equipments.find(x => x.id === asset.id); description = `${e?.name}`; }
@@ -72,7 +117,8 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
               item_id: asset.id, 
               description: description, 
               checkout_time: new Date().toISOString(),
-              status: 'PENDING' 
+              status: 'PENDING',
+              meta: Object.keys(meta).length > 0 ? meta : null
           };
       });
 
@@ -85,6 +131,7 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
           setReceiverId('');
           setSelectedAssets([]);
           onRefresh();
+          setShowVehicleStartModal(false);
       } catch (err: any) {
           console.error("Erro insert loan:", err);
           alert('Erro ao criar cautela: ' + err.message);
@@ -94,6 +141,22 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   };
 
   const handleReturn = (loan: LoanRecord) => {
+      // Special handling for Vehicles
+      if (loan.assetType === 'VEHICLE') {
+          setVehicleReturnData({
+              loanId: loan.id,
+              vehicleId: loan.assetId,
+              model: loan.assetDescription,
+              kmStart: loan.meta?.kmStart || 0,
+              kmEnd: loan.meta?.kmStart || 0,
+              refuel: false,
+              fuelLiters: '',
+              fuelType: 'Gasolina'
+          });
+          setShowVehicleReturnModal(true);
+          return;
+      }
+
       onShowConfirm(
           "Confirmar Devolução", 
           `Deseja confirmar a devolução do item: ${loan.assetDescription}?`, 
@@ -116,9 +179,62 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
       );
   };
 
+  const processVehicleReturn = async () => {
+      if (!vehicleReturnData) return;
+
+      if (vehicleReturnData.kmEnd < vehicleReturnData.kmStart) {
+          alert('A quilometragem final não pode ser menor que a inicial.');
+          return;
+      }
+
+      setIsSubmitting(true);
+      try {
+          // Update Loan Record
+          const metaUpdate = {
+              kmStart: vehicleReturnData.kmStart,
+              kmEnd: vehicleReturnData.kmEnd,
+              fuelRefill: vehicleReturnData.refuel,
+              fuelLiters: vehicleReturnData.refuel ? parseFloat(vehicleReturnData.fuelLiters) : null,
+              fuelType: vehicleReturnData.refuel ? vehicleReturnData.fuelType : null
+          };
+
+          const { error: loanError } = await supabase.from('loan_records').update({
+              status: 'COMPLETED',
+              return_time: new Date().toISOString(),
+              meta: metaUpdate
+          }).eq('id', vehicleReturnData.loanId);
+
+          if (loanError) throw loanError;
+
+          // Update Vehicle KM
+          const { error: vehicleError } = await supabase.from('vehicles').update({
+              current_km: vehicleReturnData.kmEnd
+          }).eq('id', vehicleReturnData.vehicleId);
+
+          if (vehicleError) throw vehicleError;
+
+          onLogAction('LOAN_RETURN', `Recebeu veículo: ${vehicleReturnData.model}. KM Final: ${vehicleReturnData.kmEnd}`);
+          setShowVehicleReturnModal(false);
+          setVehicleReturnData(null);
+          onRefresh();
+      } catch (err: any) {
+           console.error("Erro return vehicle:", err);
+           alert('Erro ao devolver veículo: ' + err.message);
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
+
   // --- BATCH RETURN LOGIC (NEW) ---
   const handleReturnBatch = (loansToReturn: LoanRecord[]) => {
       if (loansToReturn.length === 0) return;
+      
+      // If batch contains a vehicle, force individual return for the vehicle (simplify logic)
+      if (loansToReturn.some(l => l.assetType === 'VEHICLE')) {
+          alert("Este lote contém um veículo. Por favor, devolva o veículo individualmente para registrar a quilometragem.");
+          return;
+      }
+
       const receiverName = loansToReturn[0].receiverName;
 
       onShowConfirm(
@@ -256,7 +372,7 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
   };
 
   return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in relative">
           {/* Header & Tabs */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="flex items-center gap-3">
@@ -488,6 +604,9 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                                    <div className="flex-1">
                                                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">{loan.assetDescription}</p>
                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">{loan.assetType === 'VEHICLE' ? 'Veículo' : loan.assetType === 'VEST' ? 'Colete' : loan.assetType === 'RADIO' ? 'Rádio' : 'Equipamento'}</p>
+                                                       {loan.assetType === 'VEHICLE' && loan.meta?.kmStart && (
+                                                           <p className="text-[9px] text-blue-500 font-mono mt-0.5">KM Saída: {loan.meta.kmStart}</p>
+                                                       )}
                                                    </div>
                                                    {/* Individual confirm button (optional but useful) */}
                                                    <button 
@@ -553,6 +672,9 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                                             <p className="text-[9px] font-bold text-slate-400 uppercase">{loan.assetType === 'VEHICLE' ? 'Veículo' : loan.assetType === 'VEST' ? 'Colete' : loan.assetType === 'RADIO' ? 'Rádio' : 'Equipamento'}</p>
                                                             <span className="text-[9px] font-mono text-slate-400">• Retirado em {new Date(loan.checkoutTime).toLocaleDateString()} {new Date(loan.checkoutTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                                        </div>
+                                                       {loan.assetType === 'VEHICLE' && loan.meta?.kmStart && (
+                                                           <p className="text-[9px] text-blue-500 font-mono mt-0.5">KM Saída: {loan.meta.kmStart}</p>
+                                                       )}
                                                    </div>
                                                    {/* Individual return button */}
                                                    <button 
@@ -596,6 +718,14 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                             {loan.status === 'PENDING' && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-black uppercase">Pendente</span>}
                                             {loan.status === 'COMPLETED' && <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-black uppercase">Devolvido</span>}
                                         </div>
+                                        {/* KM Metadata Display */}
+                                        {loan.assetType === 'VEHICLE' && loan.meta && (loan.meta.kmStart || loan.meta.kmEnd) && (
+                                            <div className="mt-1 flex gap-2 text-[9px] font-mono text-slate-500">
+                                                {loan.meta.kmStart && <span>Saída: {loan.meta.kmStart} Km</span>}
+                                                {loan.meta.kmEnd && <span>Chegada: {loan.meta.kmEnd} Km</span>}
+                                                {loan.meta.fuelRefill && <span className="text-blue-500">Abastecido: {loan.meta.fuelLiters}L ({loan.meta.fuelType})</span>}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 
@@ -631,6 +761,142 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                           </button>
                       </div>
                   )}
+              </div>
+          )}
+
+          {/* Modal: Confirm Vehicle Start KM */}
+          <Modal 
+             isOpen={showVehicleStartModal}
+             type="confirm"
+             title="Confirmação de Saída de Viatura"
+             message=""
+             onClose={() => setShowVehicleStartModal(false)}
+             onConfirm={() => processLoanCreation(vehicleStartData?.manualKm)}
+          >
+             {/* We override the Modal content somewhat by injecting children into a custom wrapper or just replacing Modal if needed. 
+                 The current Modal component doesn't support custom children in the 'confirm' slot easily without modification,
+                 but we can achieve this by not using the generic Modal for form inputs or creating a specific one.
+                 
+                 However, since I cannot modify Modal.tsx in this specific prompt turn effectively without returning it all,
+                 I will implement a custom overlay here for the input form.
+             */}
+          </Modal>
+
+          {/* Custom Overlay for Vehicle Start */}
+          {showVehicleStartModal && vehicleStartData && (
+              <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-sm w-full p-6 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-3 mb-4">
+                          <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Car size={24}/></div>
+                          <div>
+                              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase">Saída de Viatura</h3>
+                              <p className="text-xs text-slate-500 uppercase">{vehicleStartData.model}</p>
+                          </div>
+                      </div>
+                      
+                      <div className="mb-6">
+                          <label className="block text-xs font-black text-slate-500 uppercase mb-1">Quilometragem Inicial (KM)</label>
+                          <div className="relative">
+                              <input 
+                                  type="number" 
+                                  value={vehicleStartData.manualKm}
+                                  onChange={(e) => setVehicleStartData({...vehicleStartData, manualKm: parseInt(e.target.value) || 0})}
+                                  className="w-full pl-10 p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <Gauge className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-1">Confirme o odômetro antes de sair.</p>
+                      </div>
+
+                      <div className="flex justify-end gap-3">
+                          <button onClick={() => setShowVehicleStartModal(false)} className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                          <button onClick={() => processLoanCreation(vehicleStartData.manualKm)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-black uppercase hover:bg-blue-700 shadow-lg">Confirmar Saída</button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {/* Custom Overlay for Vehicle Return */}
+          {showVehicleReturnModal && vehicleReturnData && (
+              <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl max-w-sm w-full p-6 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-3 mb-4">
+                          <div className="p-3 bg-green-100 text-green-600 rounded-full"><CornerDownLeft size={24}/></div>
+                          <div>
+                              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase">Devolução de Viatura</h3>
+                              <p className="text-xs text-slate-500 uppercase">{vehicleReturnData.model}</p>
+                          </div>
+                      </div>
+                      
+                      <div className="space-y-4 mb-6">
+                          <div>
+                              <label className="block text-xs font-black text-slate-500 uppercase mb-1">Quilometragem Final (KM)</label>
+                              <div className="relative">
+                                  <input 
+                                      type="number" 
+                                      value={vehicleReturnData.kmEnd}
+                                      onChange={(e) => setVehicleReturnData({...vehicleReturnData, kmEnd: parseInt(e.target.value) || 0})}
+                                      className="w-full pl-10 p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <Gauge className="absolute left-3 top-3.5 text-slate-400" size={20} />
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1">KM Saída: {vehicleReturnData.kmStart}</p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                               <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                   <input 
+                                      type="checkbox" 
+                                      checked={vehicleReturnData.refuel} 
+                                      onChange={(e) => setVehicleReturnData({...vehicleReturnData, refuel: e.target.checked})}
+                                      className="rounded text-blue-600 focus:ring-blue-500"
+                                   />
+                                   <span className="text-xs font-bold uppercase text-slate-700 dark:text-slate-300 flex items-center gap-1"><Fuel size={14}/> Houve Abastecimento?</span>
+                               </label>
+
+                               {vehicleReturnData.refuel && (
+                                   <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg animate-in slide-in-from-top-1">
+                                       <div>
+                                           <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Litros</label>
+                                           <div className="relative">
+                                                <input 
+                                                    type="number" 
+                                                    value={vehicleReturnData.fuelLiters}
+                                                    onChange={(e) => setVehicleReturnData({...vehicleReturnData, fuelLiters: e.target.value})}
+                                                    className="w-full pl-7 p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold"
+                                                    placeholder="0.0"
+                                                />
+                                                <Droplet size={12} className="absolute left-2 top-2.5 text-slate-400"/>
+                                           </div>
+                                       </div>
+                                       <div>
+                                           <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Combustível</label>
+                                           <select 
+                                              value={vehicleReturnData.fuelType}
+                                              onChange={(e) => setVehicleReturnData({...vehicleReturnData, fuelType: e.target.value})}
+                                              className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold uppercase"
+                                           >
+                                               <option>Gasolina</option>
+                                               <option>Etanol</option>
+                                               <option>Diesel</option>
+                                           </select>
+                                       </div>
+                                   </div>
+                               )}
+                          </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3">
+                          <button onClick={() => setShowVehicleReturnModal(false)} className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                          <button 
+                            onClick={processVehicleReturn} 
+                            disabled={isSubmitting}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-black uppercase hover:bg-emerald-700 shadow-lg flex items-center gap-2 disabled:opacity-70"
+                          >
+                             {isSubmitting ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle size={14}/>} Confirmar
+                          </button>
+                      </div>
+                  </div>
               </div>
           )}
       </div>
