@@ -1,6 +1,6 @@
 {
   "name": "Registro de Alterações",
-  "description": "Sistema profissional de gestão de alterações prediais e ocorrências para vigilantes e administradores.",
+  "description": "Sistema de Gestão de Alterações Prediais e digitalização de ocorrências para vigilância municipal.",
   "requestFramePermissions": [
     "camera",
     "geolocation"

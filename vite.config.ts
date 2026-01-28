@@ -14,7 +14,7 @@ const getGitHash = () => {
 
 const gitHash = getGitHash();
 const buildDate = new Date().toLocaleDateString('pt-BR');
-const appVersion = '1.0.3'; // Versão base do sistema
+const appVersion = '1.0.4'; // Versão base do sistema
 
 // https://vitejs.dev/config/
 export default defineConfig({

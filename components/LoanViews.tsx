@@ -6,7 +6,7 @@ import {
   ArrowRightLeft, History, Plus, Search, User as UserIcon, 
   Car, Shield, Radio as RadioIcon, Package, CheckCircle, 
   XCircle, Clock, Calendar, ChevronRight, CornerDownLeft, 
-  AlertCircle, Loader2, Filter, Layers, Gauge, Fuel, DollarSign, Droplet
+  AlertCircle, Loader2, Filter, Layers, Gauge, Fuel, DollarSign, Droplet, ArrowUpRight, AlertTriangle
 } from 'lucide-react';
 import { Modal } from './Modal';
 
@@ -56,7 +56,9 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
       kmEnd: number,
       refuel: boolean,
       fuelLiters: string,
-      fuelType: string
+      fuelType: string,
+      fuelKm: string,
+      batchIdsToComplete?: string[] // IDs de outros itens do lote para devolver junto
   } | null>(null);
 
   // Filter lists for Form
@@ -148,10 +150,11 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
               vehicleId: loan.assetId,
               model: loan.assetDescription,
               kmStart: loan.meta?.kmStart || 0,
-              kmEnd: loan.meta?.kmStart || 0,
+              kmEnd: loan.meta?.kmStart || 0, // Default to start KM
               refuel: false,
               fuelLiters: '',
-              fuelType: 'Gasolina'
+              fuelType: 'Gasolina',
+              fuelKm: ''
           });
           setShowVehicleReturnModal(true);
           return;
@@ -189,13 +192,14 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
 
       setIsSubmitting(true);
       try {
-          // Update Loan Record
+          // Update Loan Record (Vehicle)
           const metaUpdate = {
               kmStart: vehicleReturnData.kmStart,
               kmEnd: vehicleReturnData.kmEnd,
               fuelRefill: vehicleReturnData.refuel,
-              fuelLiters: vehicleReturnData.refuel ? parseFloat(vehicleReturnData.fuelLiters) : null,
-              fuelType: vehicleReturnData.refuel ? vehicleReturnData.fuelType : null
+              fuelLiters: vehicleReturnData.refuel ? parseFloat(vehicleReturnData.fuelLiters.replace(',', '.')) : null,
+              fuelType: vehicleReturnData.refuel ? vehicleReturnData.fuelType : null,
+              fuelKm: vehicleReturnData.refuel && vehicleReturnData.fuelKm ? parseInt(vehicleReturnData.fuelKm.replace(/\D/g, '')) : null
           };
 
           const { error: loanError } = await supabase.from('loan_records').update({
@@ -206,14 +210,29 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
 
           if (loanError) throw loanError;
 
-          // Update Vehicle KM
+          // Update Vehicle KM Table
           const { error: vehicleError } = await supabase.from('vehicles').update({
-              current_km: vehicleReturnData.kmEnd
+              currentKm: vehicleReturnData.kmEnd
           }).eq('id', vehicleReturnData.vehicleId);
 
           if (vehicleError) throw vehicleError;
 
-          onLogAction('LOAN_RETURN', `Recebeu veículo: ${vehicleReturnData.model}. KM Final: ${vehicleReturnData.kmEnd}`);
+          // Process Other Items in Batch (if any)
+          if (vehicleReturnData.batchIdsToComplete && vehicleReturnData.batchIdsToComplete.length > 0) {
+              const { error: batchError } = await supabase.from('loan_records').update({
+                  status: 'COMPLETED',
+                  return_time: new Date().toISOString()
+              }).in('id', vehicleReturnData.batchIdsToComplete);
+
+              if (batchError) throw batchError;
+          }
+
+          const isBatch = vehicleReturnData.batchIdsToComplete && vehicleReturnData.batchIdsToComplete.length > 0;
+          const logMsg = isBatch
+              ? `Recebeu devolução de lote com Viatura: ${vehicleReturnData.model} (KM: ${vehicleReturnData.kmEnd}) + ${vehicleReturnData.batchIdsToComplete!.length} itens.`
+              : `Recebeu veículo: ${vehicleReturnData.model}. KM Final: ${vehicleReturnData.kmEnd}`;
+
+          onLogAction('LOAN_RETURN', logMsg);
           setShowVehicleReturnModal(false);
           setVehicleReturnData(null);
           onRefresh();
@@ -225,13 +244,32 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
       }
   };
 
-  // --- BATCH RETURN LOGIC (NEW) ---
+  // --- BATCH RETURN LOGIC (UPDATED) ---
   const handleReturnBatch = (loansToReturn: LoanRecord[]) => {
       if (loansToReturn.length === 0) return;
       
-      // If batch contains a vehicle, force individual return for the vehicle (simplify logic)
-      if (loansToReturn.some(l => l.assetType === 'VEHICLE')) {
-          alert("Este lote contém um veículo. Por favor, devolva o veículo individualmente para registrar a quilometragem.");
+      // Check if batch contains a vehicle
+      const vehicleLoan = loansToReturn.find(l => l.assetType === 'VEHICLE');
+
+      if (vehicleLoan) {
+          // Identify other items to return together
+          const otherLoanIds = loansToReturn
+              .filter(l => l.id !== vehicleLoan.id)
+              .map(l => l.id);
+
+          setVehicleReturnData({
+              loanId: vehicleLoan.id,
+              vehicleId: vehicleLoan.assetId,
+              model: vehicleLoan.assetDescription,
+              kmStart: vehicleLoan.meta?.kmStart || 0,
+              kmEnd: vehicleLoan.meta?.kmStart || 0, // Default to start KM
+              refuel: false,
+              fuelLiters: '',
+              fuelType: 'Gasolina',
+              fuelKm: '',
+              batchIdsToComplete: otherLoanIds // Pass the rest of the batch
+          });
+          setShowVehicleReturnModal(true);
           return;
       }
 
@@ -773,13 +811,6 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
              onClose={() => setShowVehicleStartModal(false)}
              onConfirm={() => processLoanCreation(vehicleStartData?.manualKm)}
           >
-             {/* We override the Modal content somewhat by injecting children into a custom wrapper or just replacing Modal if needed. 
-                 The current Modal component doesn't support custom children in the 'confirm' slot easily without modification,
-                 but we can achieve this by not using the generic Modal for form inputs or creating a specific one.
-                 
-                 However, since I cannot modify Modal.tsx in this specific prompt turn effectively without returning it all,
-                 I will implement a custom overlay here for the input form.
-             */}
           </Modal>
 
           {/* Custom Overlay for Vehicle Start */}
@@ -798,19 +829,55 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                           <label className="block text-xs font-black text-slate-500 uppercase mb-1">Quilometragem Inicial (KM)</label>
                           <div className="relative">
                               <input 
-                                  type="number" 
-                                  value={vehicleStartData.manualKm}
-                                  onChange={(e) => setVehicleStartData({...vehicleStartData, manualKm: parseInt(e.target.value) || 0})}
-                                  className="w-full pl-10 p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                  type="text" 
+                                  value={vehicleStartData.manualKm ? vehicleStartData.manualKm.toLocaleString('pt-BR') : ''}
+                                  onChange={(e) => {
+                                      const rawValue = e.target.value.replace(/\D/g, '');
+                                      const numeric = rawValue ? parseInt(rawValue) : 0;
+                                      setVehicleStartData({...vehicleStartData, manualKm: numeric});
+                                  }}
+                                  className={`w-full pl-10 p-3 rounded-lg border bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 transition-all ${
+                                      vehicleStartData.manualKm < vehicleStartData.currentKm 
+                                        ? 'border-red-300 focus:ring-red-500 text-red-600' 
+                                        : 'border-slate-300 dark:border-slate-600 focus:ring-blue-500 text-slate-800 dark:text-white'
+                                  }`}
                               />
                               <Gauge className="absolute left-3 top-3.5 text-slate-400" size={20} />
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-1">Confirme o odômetro antes de sair.</p>
+                          
+                          {/* Visual Validation & Mask Display */}
+                          <div className="mt-3">
+                              {vehicleStartData.manualKm < vehicleStartData.currentKm ? (
+                                  <div className="flex items-start gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900">
+                                      <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                                      <div>
+                                          <p className="text-[10px] font-black uppercase">KM Inconsistente</p>
+                                          <p className="text-[10px]">Valor menor que o atual ({vehicleStartData.currentKm.toLocaleString('pt-BR')} KM).</p>
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <div className="flex items-center justify-between text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                                      <div className="flex items-center gap-2">
+                                          <CheckCircle size={16} />
+                                          <span className="text-[10px] font-black uppercase">Quilometragem Validada</span>
+                                      </div>
+                                      {vehicleStartData.manualKm > vehicleStartData.currentKm && (
+                                          <span className="text-[10px] font-mono font-bold">+{vehicleStartData.manualKm - vehicleStartData.currentKm} Km</span>
+                                      )}
+                                  </div>
+                              )}
+                          </div>
                       </div>
 
                       <div className="flex justify-end gap-3">
                           <button onClick={() => setShowVehicleStartModal(false)} className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                          <button onClick={() => processLoanCreation(vehicleStartData.manualKm)} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-black uppercase hover:bg-blue-700 shadow-lg">Confirmar Saída</button>
+                          <button 
+                            onClick={() => processLoanCreation(vehicleStartData.manualKm)} 
+                            disabled={vehicleStartData.manualKm < vehicleStartData.currentKm}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-black uppercase hover:bg-blue-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                          >
+                              Confirmar Saída
+                          </button>
                       </div>
                   </div>
               </div>
@@ -825,6 +892,9 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                           <div>
                               <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase">Devolução de Viatura</h3>
                               <p className="text-xs text-slate-500 uppercase">{vehicleReturnData.model}</p>
+                              {vehicleReturnData.batchIdsToComplete && vehicleReturnData.batchIdsToComplete.length > 0 && (
+                                  <p className="text-[10px] text-blue-500 font-bold uppercase mt-1">+ {vehicleReturnData.batchIdsToComplete.length} itens do lote serão devolvidos.</p>
+                              )}
                           </div>
                       </div>
                       
@@ -833,14 +903,38 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                               <label className="block text-xs font-black text-slate-500 uppercase mb-1">Quilometragem Final (KM)</label>
                               <div className="relative">
                                   <input 
-                                      type="number" 
-                                      value={vehicleReturnData.kmEnd}
-                                      onChange={(e) => setVehicleReturnData({...vehicleReturnData, kmEnd: parseInt(e.target.value) || 0})}
-                                      className="w-full pl-10 p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                      type="text" 
+                                      value={vehicleReturnData.kmEnd ? vehicleReturnData.kmEnd.toLocaleString('pt-BR') : ''}
+                                      onChange={(e) => {
+                                          const rawValue = e.target.value.replace(/\D/g, '');
+                                          const numeric = rawValue ? parseInt(rawValue) : 0;
+                                          setVehicleReturnData({...vehicleReturnData, kmEnd: numeric});
+                                      }}
+                                      className={`w-full pl-10 p-3 rounded-lg border bg-slate-50 dark:bg-slate-800 font-bold text-lg outline-none focus:ring-2 transition-all ${
+                                          vehicleReturnData.kmEnd < vehicleReturnData.kmStart
+                                            ? 'border-red-300 focus:ring-red-500 text-red-600' 
+                                            : 'border-slate-300 dark:border-slate-600 focus:ring-blue-500 text-slate-800 dark:text-white'
+                                      }`}
                                   />
                                   <Gauge className="absolute left-3 top-3.5 text-slate-400" size={20} />
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-1">KM Saída: {vehicleReturnData.kmStart}</p>
+                              
+                              <div className="mt-2">
+                                  {vehicleReturnData.kmEnd < vehicleReturnData.kmStart ? (
+                                      <div className="flex items-start gap-2 text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900">
+                                          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                                          <div>
+                                              <p className="text-[10px] font-black uppercase">Inconsistência</p>
+                                              <p className="text-[10px]">Menor que saída ({vehicleReturnData.kmStart.toLocaleString('pt-BR')} KM).</p>
+                                          </div>
+                                      </div>
+                                  ) : (
+                                      <div className="flex items-center justify-between text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg border border-blue-100 dark:border-blue-900">
+                                          <span className="text-[10px] font-black uppercase">Total Percorrido</span>
+                                          <span className="text-sm font-black font-mono">{(vehicleReturnData.kmEnd - vehicleReturnData.kmStart).toLocaleString('pt-BR')} Km</span>
+                                      </div>
+                                  )}
+                              </div>
                           </div>
 
                           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -855,31 +949,57 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                                </label>
 
                                {vehicleReturnData.refuel && (
-                                   <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg animate-in slide-in-from-top-1">
-                                       <div>
-                                           <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Litros</label>
-                                           <div className="relative">
-                                                <input 
-                                                    type="number" 
-                                                    value={vehicleReturnData.fuelLiters}
-                                                    onChange={(e) => setVehicleReturnData({...vehicleReturnData, fuelLiters: e.target.value})}
-                                                    className="w-full pl-7 p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold"
-                                                    placeholder="0.0"
-                                                />
-                                                <Droplet size={12} className="absolute left-2 top-2.5 text-slate-400"/>
+                                   <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg animate-in slide-in-from-top-1 space-y-3">
+                                       <div className="grid grid-cols-2 gap-3">
+                                           <div>
+                                               <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Litros</label>
+                                               <div className="relative">
+                                                    <input 
+                                                        type="text" 
+                                                        value={vehicleReturnData.fuelLiters}
+                                                        onChange={(e) => {
+                                                            let val = e.target.value.replace('.', ',');
+                                                            if (/^\d*,?\d*$/.test(val)) {
+                                                                setVehicleReturnData({...vehicleReturnData, fuelLiters: val})
+                                                            }
+                                                        }}
+                                                        className="w-full pl-7 p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold bg-white dark:bg-slate-900"
+                                                        placeholder="0,0"
+                                                        inputMode="decimal"
+                                                    />
+                                                    <Droplet size={12} className="absolute left-2 top-2.5 text-slate-400"/>
+                                               </div>
+                                           </div>
+                                           <div>
+                                               <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Combustível</label>
+                                               <select 
+                                                  value={vehicleReturnData.fuelType}
+                                                  onChange={(e) => setVehicleReturnData({...vehicleReturnData, fuelType: e.target.value})}
+                                                  className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold uppercase bg-white dark:bg-slate-900"
+                                               >
+                                                   <option>Gasolina</option>
+                                                   <option>Etanol</option>
+                                                   <option>Diesel</option>
+                                               </select>
                                            </div>
                                        </div>
                                        <div>
-                                           <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">Combustível</label>
-                                           <select 
-                                              value={vehicleReturnData.fuelType}
-                                              onChange={(e) => setVehicleReturnData({...vehicleReturnData, fuelType: e.target.value})}
-                                              className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold uppercase"
-                                           >
-                                               <option>Gasolina</option>
-                                               <option>Etanol</option>
-                                               <option>Diesel</option>
-                                           </select>
+                                            <label className="block text-[9px] font-black text-slate-500 uppercase mb-1">KM do Abastecimento</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="text" 
+                                                    value={vehicleReturnData.fuelKm ? parseInt(vehicleReturnData.fuelKm).toLocaleString('pt-BR') : ''}
+                                                    onChange={(e) => {
+                                                        const raw = e.target.value.replace(/\D/g, '');
+                                                        const val = raw ? parseInt(raw) : '';
+                                                        setVehicleReturnData({...vehicleReturnData, fuelKm: val.toString()})
+                                                    }}
+                                                    className="w-full pl-7 p-2 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold bg-white dark:bg-slate-900"
+                                                    placeholder="0"
+                                                    inputMode="numeric"
+                                                />
+                                                <Gauge size={12} className="absolute left-2 top-2.5 text-slate-400"/>
+                                            </div>
                                        </div>
                                    </div>
                                )}
@@ -890,8 +1010,8 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                           <button onClick={() => setShowVehicleReturnModal(false)} className="px-4 py-2 text-xs font-bold uppercase text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
                           <button 
                             onClick={processVehicleReturn} 
-                            disabled={isSubmitting}
-                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-black uppercase hover:bg-emerald-700 shadow-lg flex items-center gap-2 disabled:opacity-70"
+                            disabled={isSubmitting || vehicleReturnData.kmEnd < vehicleReturnData.kmStart}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-xs font-black uppercase hover:bg-emerald-700 shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                           >
                              {isSubmitting ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle size={14}/>} Confirmar
                           </button>
