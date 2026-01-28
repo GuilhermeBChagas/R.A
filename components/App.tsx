@@ -17,7 +17,7 @@ import { AlterationTypeManager } from './AlterationTypeManager';
 import { ProfileView } from './ProfileView'; 
 import { VehicleList, VehicleForm, VestList, VestForm, RadioList, RadioForm, EquipmentList, EquipmentForm } from './AssetViews';
 import { LoanViews } from './LoanViews';
-import { User, Building, Incident, ViewState, UserRole, Sector, AlterationType, SystemLog, Vehicle, Vest, Radio, Equipment, LoanRecord, SystemPermissionMap, PermissionKey, UserPermissionOverrides } from '../types';
+import { User, Building, Incident, ViewState, UserRole, Sector, AlterationType, SystemLog, Vehicle, Vest, Radio, Equipment, LoanRecord, SystemPermissionMap, PermissionKey, UserPermissionOverrides, MenuVisibilityMap } from '../types';
 import { LayoutDashboard, Building as BuildingIcon, Users, LogOut, Menu, FileText, Pencil, Plus, Map, Trash2, ChevronRight, Shield, Loader2, Search, PieChart as PieChartIcon, Download, Filter, CheckCircle, Clock, X, AlertCircle, Database, Settings, UserCheck, Moon, Sun, Wrench, ChevronDown, FolderOpen, Car, Radio as RadioIcon, Package, ArrowRightLeft, CloudOff, History, Ban, XCircle, Tag, RefreshCw, Bell, Key, Hash, FileSpreadsheet } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
@@ -477,6 +477,7 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<SystemPermissionMap>(DEFAULT_PERMISSIONS);
   const [userOverrides, setUserOverrides] = useState<UserPermissionOverrides>({});
+  const [menuVisibility, setMenuVisibility] = useState<MenuVisibilityMap>({});
   const [view, setView] = useState<ViewState>('DASHBOARD');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -679,6 +680,10 @@ export function App() {
       const { data: overrideData } = await supabase.from('app_config').select('value').eq('key', 'user_permission_overrides').single();
       if (overrideData && overrideData.value) { setUserOverrides(JSON.parse(overrideData.value)); }
       else { setUserOverrides({}); }
+
+      const { data: menuData } = await supabase.from('app_config').select('value').eq('key', 'menu_visibility').single();
+      if (menuData && menuData.value) { setMenuVisibility(JSON.parse(menuData.value)); }
+      else { setMenuVisibility({}); }
     } catch (e) { setPermissions(DEFAULT_PERMISSIONS); }
   }, []);
 
@@ -700,6 +705,15 @@ export function App() {
     } catch (e: any) { showError('Erro', e.message); }
   };
 
+  const handleUpdateMenuVisibility = async (newConfig: MenuVisibilityMap) => {
+    try {
+      await supabase.from('app_config').upsert({ key: 'menu_visibility', value: JSON.stringify(newConfig) });
+      setMenuVisibility(newConfig);
+      createLog('MANAGE_SETTINGS', 'Atualizou layout de menus por cargo');
+      showAlert('Sucesso', 'Layout atualizado com sucesso.');
+    } catch (e: any) { showError('Erro', e.message); }
+  };
+
   const can = (action: PermissionKey): boolean => {
     if (!user) return false;
     
@@ -710,6 +724,14 @@ export function App() {
     // Fallback to role-based permission
     const allowedRoles = permissions[action] || [];
     return allowedRoles.includes(user.role);
+  };
+
+  const isMenuVisible = (menuId: string): boolean => {
+    if (!user) return false;
+    const roleConfig = menuVisibility[user.role];
+    // If no config exists for the role, default to showing everything (permissive by default for easy start)
+    if (!roleConfig) return true;
+    return roleConfig.includes(menuId);
   };
 
   const fetchGlobalConfig = useCallback(async () => {
@@ -1082,6 +1104,7 @@ export function App() {
       case 'TOOLS': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} currentLogoLeft={customLogoLeft} onUpdateLogoLeft={handleUpdateLogoLeft} onLogAction={createLog} initialTab='APPEARANCE' />;
       case 'IMPORT_EXPORT': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} currentLogoLeft={customLogoLeft} onUpdateLogoLeft={handleUpdateLogoLeft} onLogAction={createLog} initialTab='IMPORT_EXPORT' />;
       case 'PERMISSIONS_TOOLS': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} isLocalMode={isLocalMode} onToggleLocalMode={handleToggleLocalMode} unsyncedCount={unsyncedIncidents.length} onSync={handleSyncData} initialTab='PERMISSIONS' onLogAction={createLog} permissions={permissions} onUpdatePermissions={handleUpdatePermissions} userOverrides={userOverrides} onUpdateOverrides={handleUpdateOverrides} users={users} />;
+      case 'LAYOUT_MANAGER': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} initialTab='LAYOUT_MANAGER' menuVisibility={menuVisibility} onUpdateMenuVisibility={handleUpdateMenuVisibility} onLogAction={createLog} permissions={permissions} />;
       case 'DATABASE_TOOLS': return <ToolsView logs={logs} onTestLog={async () => { await createLog('UPDATE_INCIDENT', 'Teste de logs'); await fetchLogs(); }} currentLogo={customLogoRight} onUpdateLogo={handleUpdateLogoRight} isLocalMode={isLocalMode} onToggleLocalMode={handleToggleLocalMode} unsyncedCount={unsyncedIncidents.length} onSync={handleSyncData} initialTab='DATABASE' onLogAction={createLog} permissions={permissions} onUpdatePermissions={handleUpdatePermissions} />;
       case 'INCIDENT_DETAIL': return <IncidentDetail incident={selectedIncident!} building={buildings.find(b => b.id === selectedIncident?.buildingId)} author={users.find(u => u.id === selectedIncident?.userId)} onBack={() => handleNavigate('DASHBOARD')} onApprove={handleApproveIncident} onEdit={() => { setEditingIncident(selectedIncident); handleNavigate('NEW_RECORD'); }} onDelete={handleDeleteIncident} customLogo={customLogoRight} customLogoLeft={customLogoLeft} canEdit={can('EDIT_INCIDENT')} canDelete={can('DELETE_INCIDENT')} canApprove={can('APPROVE_INCIDENT')} />;
       case 'PROFILE': return <ProfileView user={user!} onUpdatePassword={handleUpdatePassword} />;
@@ -1108,54 +1131,60 @@ export function App() {
             {!isSidebarCollapsed && <div className="text-center leading-none"><h1 className="font-black text-sm tracking-wide text-white">VIGILANTE</h1><h1 className="font-black text-xs tracking-widest text-brand-200 uppercase mt-0.5">Municipal</h1></div>}
           </div>
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            {can('VIEW_DASHBOARD') && <NavItem icon={<LayoutDashboard />} label="Painel de Controle" active={view === 'DASHBOARD'} onClick={() => handleNavigate('DASHBOARD')} collapsed={isSidebarCollapsed} />}
-            {can('CREATE_INCIDENT') && <NavItem icon={<FileText />} label="Registar R.A" active={view === 'NEW_RECORD'} onClick={() => { setEditingIncident(null); handleNavigate('NEW_RECORD'); }} collapsed={isSidebarCollapsed} />}
-            {(can('MANAGE_LOANS') || can('RETURN_LOANS')) && <NavItem icon={<ArrowRightLeft />} label="Cautelas" active={view === 'LOANS'} onClick={() => handleNavigate('LOANS')} collapsed={isSidebarCollapsed} />}
+            {can('VIEW_DASHBOARD') && isMenuVisible('dashboard') && <NavItem icon={<LayoutDashboard />} label="Painel de Controle" active={view === 'DASHBOARD'} onClick={() => handleNavigate('DASHBOARD')} collapsed={isSidebarCollapsed} />}
+            {can('CREATE_INCIDENT') && isMenuVisible('new_record') && <NavItem icon={<FileText />} label="Registar R.A" active={view === 'NEW_RECORD'} onClick={() => { setEditingIncident(null); handleNavigate('NEW_RECORD'); }} collapsed={isSidebarCollapsed} />}
+            {(can('MANAGE_LOANS') || can('RETURN_LOANS')) && isMenuVisible('loans_root') && <NavItem icon={<ArrowRightLeft />} label="Cautelas" active={view === 'LOANS'} onClick={() => handleNavigate('LOANS')} collapsed={isSidebarCollapsed} />}
             <div className="pt-4 pb-2 border-t border-brand-800">
                 {!isSidebarCollapsed && <p className="px-3 text-[10px] font-bold text-brand-300 mb-2 uppercase tracking-widest">Monitoramento</p>}
-                <div className="relative">
-                    {(can('VIEW_ALL_INCIDENTS')) && <NavItem icon={<CheckCircle />} label="Históricos" active={view === 'HISTORY' || view === 'LOAN_HISTORY'} onClick={() => setReportsMenuOpen(!reportsMenuOpen)} collapsed={isSidebarCollapsed} />}
-                    {!isSidebarCollapsed && (can('VIEW_ALL_INCIDENTS')) && <div className="absolute right-3 top-3.5 pointer-events-none text-brand-300">{reportsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
-                </div>
-                {reportsMenuOpen && !isSidebarCollapsed && (can('VIEW_ALL_INCIDENTS')) && (
+                {isMenuVisible('monitoring_group') && (
+                  <div className="relative">
+                      {(can('VIEW_ALL_INCIDENTS')) && isMenuVisible('history_root') && <NavItem icon={<CheckCircle />} label="Históricos" active={view === 'HISTORY' || view === 'LOAN_HISTORY'} onClick={() => setReportsMenuOpen(!reportsMenuOpen)} collapsed={isSidebarCollapsed} />}
+                      {!isSidebarCollapsed && (can('VIEW_ALL_INCIDENTS')) && isMenuVisible('history_root') && <div className="absolute right-3 top-3.5 pointer-events-none text-brand-300">{reportsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
+                  </div>
+                )}
+                {reportsMenuOpen && !isSidebarCollapsed && (can('VIEW_ALL_INCIDENTS')) && isMenuVisible('history_root') && (
                      <div className="space-y-1 mt-1">
-                        <NavItem label="Atendimentos" icon={<FileText size={14} className="mr-2"/>} active={view === 'HISTORY'} onClick={() => handleNavigate('HISTORY')} collapsed={isSidebarCollapsed} isSubItem />
-                        <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'LOAN_HISTORY'} onClick={() => handleNavigate('LOAN_HISTORY')} collapsed={isSidebarCollapsed} isSubItem />
+                        {isMenuVisible('history_incidents') && <NavItem label="Atendimentos" icon={<FileText size={14} className="mr-2"/>} active={view === 'HISTORY'} onClick={() => handleNavigate('HISTORY')} collapsed={isSidebarCollapsed} isSubItem />}
+                        {isMenuVisible('history_loans') && <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'LOAN_HISTORY'} onClick={() => handleNavigate('LOAN_HISTORY')} collapsed={isSidebarCollapsed} isSubItem />}
                      </div>
                 )}
-                <div className="relative">
-                    <NavItem icon={<UserCheck />} label="Pendentes" active={view === 'PENDING_APPROVALS'} onClick={() => setPendentesMenuOpen(!pendentesMenuOpen)} collapsed={isSidebarCollapsed} badge={totalPendingBadge > 0 ? totalPendingBadge : undefined} />
-                    {!isSidebarCollapsed && <div className={`absolute top-3.5 pointer-events-none text-brand-300 ${totalPendingBadge > 0 ? 'right-10' : 'right-3'}`}>{pendentesMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
-                </div>
-                {pendentesMenuOpen && !isSidebarCollapsed && (
+                {isMenuVisible('monitoring_group') && isMenuVisible('pending_root') && (
+                  <div className="relative">
+                      <NavItem icon={<UserCheck />} label="Pendentes" active={view === 'PENDING_APPROVALS'} onClick={() => setPendentesMenuOpen(!pendentesMenuOpen)} collapsed={isSidebarCollapsed} badge={totalPendingBadge > 0 ? totalPendingBadge : undefined} />
+                      {!isSidebarCollapsed && <div className={`absolute top-3.5 pointer-events-none text-brand-300 ${totalPendingBadge > 0 ? 'right-10' : 'right-3'}`}>{pendentesMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
+                  </div>
+                )}
+                {pendentesMenuOpen && !isSidebarCollapsed && isMenuVisible('monitoring_group') && isMenuVisible('pending_root') && (
                      <div className="space-y-1 mt-1">
-                        <NavItem label="Atendimentos" icon={<FileText size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'INCIDENTS'} onClick={() => { setPendingSubTab('INCIDENTS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingIncidentsCount > 0 ? pendingIncidentsCount : undefined} />
-                        <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'LOANS'} onClick={() => { setPendingSubTab('LOANS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingLoansCount > 0 ? pendingLoansCount : undefined} />
+                        {isMenuVisible('pending_incidents') && <NavItem label="Atendimentos" icon={<FileText size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'INCIDENTS'} onClick={() => { setPendingSubTab('INCIDENTS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingIncidentsCount > 0 ? pendingIncidentsCount : undefined} />}
+                        {isMenuVisible('pending_loans') && <NavItem label="Cautelas" icon={<ArrowRightLeft size={14} className="mr-2"/>} active={view === 'PENDING_APPROVALS' && pendingSubTab === 'LOANS'} onClick={() => { setPendingSubTab('LOANS'); handleNavigate('PENDING_APPROVALS'); }} collapsed={isSidebarCollapsed} isSubItem badge={pendingLoansCount > 0 ? pendingLoansCount : undefined} />}
                      </div>
                 )}
                 
-                <NavItem icon={<PieChartIcon />} label="Estatísticas" active={view === 'CHARTS'} onClick={() => handleNavigate('CHARTS')} collapsed={isSidebarCollapsed} />
+                {isMenuVisible('monitoring_group') && isMenuVisible('charts') && <NavItem icon={<PieChartIcon />} label="Estatísticas" active={view === 'CHARTS'} onClick={() => handleNavigate('CHARTS')} collapsed={isSidebarCollapsed} />}
             </div>
-            {(can('MANAGE_ASSETS') || can('MANAGE_USERS') || can('MANAGE_BUILDINGS') || can('MANAGE_SECTORS') || can('MANAGE_ALTERATION_TYPES')) && (
+            {(can('MANAGE_ASSETS') || can('MANAGE_USERS') || can('MANAGE_BUILDINGS') || can('MANAGE_SECTORS') || can('MANAGE_ALTERATION_TYPES')) && isMenuVisible('admin_group') && (
                 <div className="pt-4 pb-2 border-t border-brand-800">
                     {!isSidebarCollapsed && <p className="px-3 text-[10px] font-bold text-brand-300 mb-2 uppercase tracking-widest">Administração</p>}
-                    <div className="relative">
-                        <NavItem icon={<FolderOpen />} label="Cadastros" active={view.includes('FORM') || view === 'BUILDINGS' || view === 'USERS' || view === 'VEHICLES' || view === 'VESTS' || view === 'RADIOS' || view === 'EQUIPMENTS' || view === 'ALTERATION_TYPES' || view === 'SECTORS'} onClick={() => setRegistrationsMenuOpen(!registrationsMenuOpen)} collapsed={isSidebarCollapsed} />
-                         {!isSidebarCollapsed && <div className="absolute right-3 top-3.5 pointer-events-none text-brand-300">{registrationsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
-                    </div>
-                    {registrationsMenuOpen && !isSidebarCollapsed && (
+                    {isMenuVisible('registrations_root') && (
+                      <div className="relative">
+                          <NavItem icon={<FolderOpen />} label="Cadastros" active={view.includes('FORM') || view === 'BUILDINGS' || view === 'USERS' || view === 'VEHICLES' || view === 'VESTS' || view === 'RADIOS' || view === 'EQUIPMENTS' || view === 'ALTERATION_TYPES' || view === 'SECTORS'} onClick={() => setRegistrationsMenuOpen(!registrationsMenuOpen)} collapsed={isSidebarCollapsed} />
+                          {!isSidebarCollapsed && <div className="absolute right-3 top-3.5 pointer-events-none text-brand-300">{registrationsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
+                      </div>
+                    )}
+                    {registrationsMenuOpen && !isSidebarCollapsed && isMenuVisible('registrations_root') && (
                          <div className="space-y-1 mt-1">
-                            {can('MANAGE_BUILDINGS') && (
+                            {can('MANAGE_BUILDINGS') && isMenuVisible('reg_buildings') && (
                                 <NavItem label="Próprios" icon={<BuildingIcon size={14} className="mr-2"/>} active={view === 'BUILDINGS' || view === 'BUILDING_FORM'} onClick={() => handleNavigate('BUILDINGS')} collapsed={isSidebarCollapsed} isSubItem />
                             )}
-                            {can('MANAGE_ALTERATION_TYPES') && (
+                            {can('MANAGE_ALTERATION_TYPES') && isMenuVisible('reg_types') && (
                                 <NavItem label="Tipos de Alteração" icon={<Tag size={14} className="mr-2"/>} active={view === 'ALTERATION_TYPES' || view === 'ALTERATION_TYPE_FORM'} onClick={() => handleNavigate('ALTERATION_TYPES')} collapsed={isSidebarCollapsed} isSubItem />
                             )}
-                            {can('MANAGE_SECTORS') && (
+                            {can('MANAGE_SECTORS') && isMenuVisible('reg_sectors') && (
                                 <NavItem label="Setores" icon={<Map size={14} className="mr-2"/>} active={view === 'SECTORS' || view === 'SECTOR_FORM'} onClick={() => handleNavigate('SECTORS')} collapsed={isSidebarCollapsed} isSubItem />
                             )}
-                            {can('MANAGE_USERS') && <NavItem label="Usuários" icon={<Users size={14} className="mr-2"/>} active={view === 'USERS' || view === 'USER_FORM'} onClick={() => handleNavigate('USERS')} collapsed={isSidebarCollapsed} isSubItem />}
-                            {can('MANAGE_ASSETS') && (
+                            {can('MANAGE_USERS') && isMenuVisible('reg_users') && <NavItem label="Usuários" icon={<Users size={14} className="mr-2"/>} active={view === 'USERS' || view === 'USER_FORM'} onClick={() => handleNavigate('USERS')} collapsed={isSidebarCollapsed} isSubItem />}
+                            {can('MANAGE_ASSETS') && isMenuVisible('reg_assets') && (
                               <>
                                 <div className="border-t border-brand-800 my-1 mx-4"></div>
                                 <NavItem label="Veículos" icon={<Car size={14} className="mr-2"/>} active={view === 'VEHICLES' || view === 'VEHICLE_FORM'} onClick={() => handleNavigate('VEHICLES')} collapsed={isSidebarCollapsed} isSubItem />
@@ -1166,17 +1195,18 @@ export function App() {
                             )}
                          </div>
                     )}
-                    {can('ACCESS_TOOLS') && (
+                    {can('ACCESS_TOOLS') && isMenuVisible('tools_root') && (
                       <div className="relative">
-                        <NavItem icon={<Wrench />} label="Ferramentas" active={view === 'TOOLS' || view === 'LOGS' || view === 'DATABASE_TOOLS' || view === 'PERMISSIONS_TOOLS' || view === 'IMPORT_EXPORT'} onClick={() => setToolsMenuOpen(!toolsMenuOpen)} collapsed={isSidebarCollapsed} />
+                        <NavItem icon={<Wrench />} label="Ferramentas" active={view === 'TOOLS' || view === 'LOGS' || view === 'DATABASE_TOOLS' || view === 'PERMISSIONS_TOOLS' || view === 'IMPORT_EXPORT' || view === 'LAYOUT_MANAGER'} onClick={() => setToolsMenuOpen(!toolsMenuOpen)} collapsed={isSidebarCollapsed} />
                         {!isSidebarCollapsed && <div className="absolute right-3 top-3.5 pointer-events-none text-brand-300">{toolsMenuOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</div>}
                         {toolsMenuOpen && !isSidebarCollapsed && (
                              <div className="space-y-1 mt-1">
-                                <NavItem label="Aparência" active={view === 'TOOLS'} onClick={() => handleNavigate('TOOLS')} collapsed={isSidebarCollapsed} isSubItem />
-                                <NavItem label="Importação / Exportação" active={view === 'IMPORT_EXPORT'} onClick={() => handleNavigate('IMPORT_EXPORT')} collapsed={isSidebarCollapsed} isSubItem />
-                                <NavItem label="Permissões" active={view === 'PERMISSIONS_TOOLS'} onClick={() => handleNavigate('PERMISSIONS_TOOLS')} collapsed={isSidebarCollapsed} isSubItem />
-                                <NavItem label="Log do sistema" active={view === 'LOGS'} onClick={() => handleNavigate('LOGS')} collapsed={isSidebarCollapsed} isSubItem />
-                                <NavItem label="Banco de Dados" active={view === 'DATABASE_TOOLS'} onClick={() => handleNavigate('DATABASE_TOOLS')} collapsed={isSidebarCollapsed} isSubItem />
+                                {isMenuVisible('tool_appearance') && <NavItem label="Aparência" active={view === 'TOOLS'} onClick={() => handleNavigate('TOOLS')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_layout') && <NavItem label="Dashboard (Layout)" active={view === 'LAYOUT_MANAGER'} onClick={() => handleNavigate('LAYOUT_MANAGER')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_import') && <NavItem label="Importação / Exportação" active={view === 'IMPORT_EXPORT'} onClick={() => handleNavigate('IMPORT_EXPORT')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_permissions') && <NavItem label="Permissões" active={view === 'PERMISSIONS_TOOLS'} onClick={() => handleNavigate('PERMISSIONS_TOOLS')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_logs') && <NavItem label="Log do sistema" active={view === 'LOGS'} onClick={() => handleNavigate('LOGS')} collapsed={isSidebarCollapsed} isSubItem />}
+                                {isMenuVisible('tool_database') && <NavItem label="Banco de Dados" active={view === 'DATABASE_TOOLS'} onClick={() => handleNavigate('DATABASE_TOOLS')} collapsed={isSidebarCollapsed} isSubItem />}
                              </div>
                         )}
                       </div>

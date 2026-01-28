@@ -36,6 +36,11 @@ export interface UserPermissionOverrides {
   };
 }
 
+// Novo Tipo para Visibilidade do Menu
+export interface MenuVisibilityMap {
+  [role: string]: string[]; // Array de MenuIDs visíveis
+}
+
 export interface Sector {
   id: string;
   name: string;
@@ -161,7 +166,7 @@ export interface SystemLog {
   id: string;
   userId: string;
   userName: string;
-  action: 'LOGIN' | 'LOGOUT' | 'CREATE_INCIDENT' | 'UPDATE_INCIDENT' | 'APPROVE_INCIDENT' | 'DELETE_RESOURCE' | 'USER_REGISTER' | 'CREATE_ASSET' | 'UPDATE_ASSET' | 'DELETE_ASSET' | 'LOAN_CREATE' | 'LOAN_CONFIRM' | 'LOAN_RETURN' | 'UPDATE_PERMISSIONS';
+  action: 'LOGIN' | 'LOGOUT' | 'CREATE_INCIDENT' | 'UPDATE_INCIDENT' | 'APPROVE_INCIDENT' | 'DELETE_RESOURCE' | 'USER_REGISTER' | 'CREATE_ASSET' | 'UPDATE_ASSET' | 'DELETE_ASSET' | 'LOAN_CREATE' | 'LOAN_CONFIRM' | 'LOAN_RETURN' | 'UPDATE_PERMISSIONS' | 'MANAGE_SETTINGS';
   details: string;
   timestamp: string;
 }
@@ -173,7 +178,7 @@ export type ViewState =
   | 'SECTORS' | 'SECTOR_FORM' 
   | 'ALTERATION_TYPES' | 'ALTERATION_TYPE_FORM' 
   | 'NEW_RECORD' | 'HISTORY' | 'INCIDENT_DETAIL' | 'PENDING_APPROVALS' 
-  | 'CHARTS' | 'LOGS' | 'TOOLS' | 'DATABASE_TOOLS' | 'PERMISSIONS_TOOLS' | 'PROFILE'
+  | 'CHARTS' | 'LOGS' | 'TOOLS' | 'DATABASE_TOOLS' | 'PERMISSIONS_TOOLS' | 'LAYOUT_MANAGER' | 'PROFILE'
   | 'VEHICLES' | 'VEHICLE_FORM'
   | 'VESTS' | 'VEST_FORM'
   | 'RADIOS' | 'RADIO_FORM'

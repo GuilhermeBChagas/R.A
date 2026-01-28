@@ -5,8 +5,9 @@ import { LogsView } from './LogsView';
 import { DatabaseSetup } from './DatabaseSetup';
 import { PermissionsView } from './PermissionsView';
 import { ImportExportView } from './ImportExportView';
-import { SystemLog, SystemPermissionMap, UserPermissionOverrides, User } from '../types';
-import { Settings, Shield, Save, Image as ImageIcon, Loader2, Link as LinkIcon, Database, History, RefreshCw, Key, FileSpreadsheet, Info, Github, GitCommit, Calendar, Tag, FileText, CheckCircle, AlertTriangle, Cloud, ArrowRight } from 'lucide-react';
+import { DashboardLayoutManager } from './DashboardLayoutManager';
+import { SystemLog, SystemPermissionMap, UserPermissionOverrides, User, MenuVisibilityMap } from '../types';
+import { Settings, Shield, Save, Image as ImageIcon, Loader2, Link as LinkIcon, Database, History, RefreshCw, Key, FileSpreadsheet, Info, Github, GitCommit, Calendar, Tag, FileText, CheckCircle, AlertTriangle, Cloud, ArrowRight, Layout } from 'lucide-react';
 
 // Declaração das variáveis globais injetadas pelo Vite (vite.config.ts)
 declare const __APP_VERSION__: string;
@@ -20,7 +21,7 @@ interface ToolsViewProps {
   onUpdateLogo: (logoBase64: string | null) => Promise<void>;
   currentLogoLeft?: string | null;
   onUpdateLogoLeft?: (logoBase64: string | null) => Promise<void>;
-  initialTab?: 'LOGS' | 'APPEARANCE' | 'DATABASE' | 'PERMISSIONS' | 'IMPORT_EXPORT' | 'SYSTEM';
+  initialTab?: 'LOGS' | 'APPEARANCE' | 'DATABASE' | 'PERMISSIONS' | 'IMPORT_EXPORT' | 'SYSTEM' | 'LAYOUT_MANAGER';
   isLocalMode?: boolean;
   onToggleLocalMode?: (enabled: boolean) => void;
   unsyncedCount?: number;
@@ -29,16 +30,18 @@ interface ToolsViewProps {
   onUpdatePermissions?: (perms: SystemPermissionMap) => Promise<void>;
   userOverrides?: UserPermissionOverrides;
   onUpdateOverrides?: (overrides: UserPermissionOverrides) => Promise<void>;
+  menuVisibility?: MenuVisibilityMap;
+  onUpdateMenuVisibility?: (config: MenuVisibilityMap) => Promise<void>;
   users?: User[];
   onLogAction: (action: any, details: string) => void;
 }
 
-type Tab = 'LOGS' | 'APPEARANCE' | 'DATABASE' | 'PERMISSIONS' | 'IMPORT_EXPORT' | 'SYSTEM';
+type Tab = 'LOGS' | 'APPEARANCE' | 'DATABASE' | 'PERMISSIONS' | 'IMPORT_EXPORT' | 'SYSTEM' | 'LAYOUT_MANAGER';
 
 export const ToolsView: React.FC<ToolsViewProps> = ({ 
   logs, onTestLog, currentLogo, onUpdateLogo, currentLogoLeft, onUpdateLogoLeft, initialTab,
   isLocalMode, onToggleLocalMode, unsyncedCount, onSync, permissions, onUpdatePermissions,
-  userOverrides = {}, onUpdateOverrides, users = [], onLogAction
+  userOverrides = {}, onUpdateOverrides, menuVisibility, onUpdateMenuVisibility, users = [], onLogAction
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab || 'APPEARANCE');
   
@@ -164,11 +167,13 @@ export const ToolsView: React.FC<ToolsViewProps> = ({
             {activeTab === 'PERMISSIONS' && <><Key className="text-blue-600" /> Permissões de Acesso</>}
             {activeTab === 'IMPORT_EXPORT' && <><FileSpreadsheet className="text-emerald-600" /> Dados (Excel)</>}
             {activeTab === 'SYSTEM' && <><Info className="text-purple-600" /> Sobre o Sistema</>}
+            {activeTab === 'LAYOUT_MANAGER' && <><Layout className="text-blue-600" /> Dashboard (Layout)</>}
         </h2>
         
         {/* Navigation Tabs (Simples) */}
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto">
              <button onClick={() => setActiveTab('APPEARANCE')} className={`p-2 rounded-lg ${activeTab === 'APPEARANCE' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Aparência"><Settings size={20}/></button>
+             <button onClick={() => setActiveTab('LAYOUT_MANAGER')} className={`p-2 rounded-lg ${activeTab === 'LAYOUT_MANAGER' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Dashboard (Layout)"><Layout size={20}/></button>
              <button onClick={() => setActiveTab('PERMISSIONS')} className={`p-2 rounded-lg ${activeTab === 'PERMISSIONS' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Permissões"><Key size={20}/></button>
              <button onClick={() => setActiveTab('LOGS')} className={`p-2 rounded-lg ${activeTab === 'LOGS' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-slate-400 hover:text-slate-600'}`} title="Logs"><History size={20}/></button>
              <button onClick={() => setActiveTab('IMPORT_EXPORT')} className={`p-2 rounded-lg ${activeTab === 'IMPORT_EXPORT' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'text-slate-400 hover:text-slate-600'}`} title="Importar/Exportar"><FileSpreadsheet size={20}/></button>
@@ -203,6 +208,16 @@ export const ToolsView: React.FC<ToolsViewProps> = ({
                 users={users}
                 onUpdatePermissions={onUpdatePermissions} 
                 onUpdateOverrides={onUpdateOverrides}
+              />
+          </div>
+      )}
+
+      {activeTab === 'LAYOUT_MANAGER' && menuVisibility && onUpdateMenuVisibility && (
+          <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+              <DashboardLayoutManager 
+                currentConfig={menuVisibility} 
+                systemPermissions={permissions}
+                onSave={onUpdateMenuVisibility} 
               />
           </div>
       )}
