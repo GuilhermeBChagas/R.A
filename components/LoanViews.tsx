@@ -191,12 +191,6 @@ export const LoanViews: React.FC<LoanViewsProps> = ({
                       >
                           <Plus size={14} className="inline mr-1"/> Novo
                       </button>
-                      <button 
-                        onClick={() => setActiveTab('HISTORY')} 
-                        className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-colors ${activeTab === 'HISTORY' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}
-                      >
-                          Histórico
-                      </button>
                   </div>
               )}
           </div>
