@@ -169,17 +169,30 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
     const files = e.target.files;
     if (!files) return;
 
-    // Fix: Explicitly cast FileList to File[] to avoid 'unknown' type inference in some environments (e.g. Line 178)
-    (Array.from(files) as File[]).forEach(file => {
+    const remainingSlots = 5 - photos.length;
+    if (remainingSlots <= 0) {
+      alert("Você já atingiu o limite de 5 fotos.");
+      return;
+    }
+
+    // Explicitly cast FileList to File[] and slice to limit to 5 total
+    (Array.from(files) as File[]).slice(0, remainingSlots).forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhotos(prev => [...prev, reader.result as string]);
+        setPhotos(prev => {
+          if (prev.length >= 5) return prev;
+          return [...prev, reader.result as string];
+        });
       };
       reader.readAsDataURL(file);
     });
   };
 
   const startCamera = async () => {
+    if (photos.length >= 5) {
+      alert("Você já atingiu o limite de 5 fotos.");
+      return;
+    }
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -208,6 +221,11 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   };
 
   const capturePhoto = () => {
+    if (photos.length >= 5) {
+      alert("Limite de 5 fotos atingido.");
+      stopCamera();
+      return;
+    }
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -235,6 +253,17 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
       }
       if (vigilantsList.length === 0) {
           alert("Adicione pelo menos um vigilante.");
+          return;
+      }
+      if (!endTime) {
+          alert("A Hora Final é obrigatória.");
+          return;
+      }
+
+      // Validação de Tempo: Hora Final não pode ser menor que Hora Inicial
+      // Formato HH:MM permite comparação direta de string
+      if (endTime < startTime) {
+          alert("A Hora Final não pode ser anterior à Hora Inicial.");
           return;
       }
 
@@ -274,7 +303,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                     <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight leading-none">
                         {initialData ? 'EDITAR R.A' : 'NOVO R.A'}
                     </h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">PREENCHA TODOS OS CAMPOS</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">PREENCHA TODOS OS CAMPOS (EXCETO FOTOS)</p>
                 </div>
             </div>
             
@@ -434,7 +463,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HORA FINAL</label>
                         <div className="relative">
                             <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
-                            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" />
+                            <input type="time" required value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" />
                         </div>
                     </div>
                 </div>
@@ -456,23 +485,28 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
             {/* ANEXOS E FOTOS */}
             <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">EVIDÊNCIAS FOTOGRÁFICAS</label>
+                    <div className="flex flex-col">
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">EVIDÊNCIAS FOTOGRÁFICAS</label>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase ml-1">Máximo de 5 imagens ({photos.length}/5) - Opcional</span>
+                    </div>
                     <div className="flex gap-2 w-full sm:w-auto">
                         <button 
-                            type="button"
+                            type="button" 
+                            disabled={photos.length >= 5}
                             onClick={() => document.getElementById('file-upload')?.click()}
-                            className="flex-1 sm:flex-none px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-100 dark:border-slate-700 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-sm active:scale-95"
+                            className="flex-1 sm:flex-none px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-100 dark:border-slate-700 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <ImagePlus size={16} /> Adicionar Foto
                         </button>
                         <button 
-                            type="button"
+                            type="button" 
+                            disabled={photos.length >= 5}
                             onClick={startCamera}
-                            className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+                            className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <Camera size={16} /> Abrir Câmera
                         </button>
-                        <input id="file-upload" type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
+                        <input id="file-upload" type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" disabled={photos.length >= 5} />
                     </div>
                 </div>
 
@@ -520,7 +554,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                         <div className="flex justify-between items-start">
                              <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/20">
                                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Câmera HD Ativa</span>
+                                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Câmera HD Ativa ({photos.length}/5)</span>
                              </div>
                              <button type="button" onClick={stopCamera} className="p-3 bg-black/50 backdrop-blur-md text-white rounded-2xl border border-white/20 pointer-events-auto active:scale-90 transition-transform"><X size={24} /></button>
                         </div>
@@ -530,14 +564,17 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                                 <button 
                                     type="button" 
                                     onClick={capturePhoto} 
-                                    className="p-8 bg-white text-slate-900 rounded-full shadow-2xl border-8 border-white/20 pointer-events-auto active:scale-90 transition-transform group"
+                                    disabled={photos.length >= 5}
+                                    className="p-8 bg-white text-slate-900 rounded-full shadow-2xl border-8 border-white/20 pointer-events-auto active:scale-90 transition-transform group disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <div className="bg-slate-100 rounded-full p-2 group-hover:scale-110 transition-transform">
                                         <Camera size={32} />
                                     </div>
                                 </button>
                             </div>
-                            <p className="text-[10px] font-black text-white/60 uppercase tracking-widest bg-black/40 px-4 py-1 rounded-full">Toque no botão para capturar a evidência</p>
+                            <p className="text-[10px] font-black text-white/60 uppercase tracking-widest bg-black/40 px-4 py-1 rounded-full">
+                                {photos.length >= 5 ? 'Limite atingido' : 'Toque no botão para capturar a evidência'}
+                            </p>
                         </div>
                     </div>
                 </div>
