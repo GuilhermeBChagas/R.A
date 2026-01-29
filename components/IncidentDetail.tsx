@@ -42,7 +42,7 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({
     const element = contentRef.current;
     
     const opt = {
-        margin: [5, 5, 5, 5], // Margens reduzidas
+        margin: [5, 5, 5, 5], 
         filename: `RA_${incident.raCode.replace('/','-')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
@@ -131,203 +131,221 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({
         </button>
         <div className="flex gap-2">
             <button onClick={() => window.print()} className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-md font-black text-[10px] md:text-xs uppercase flex items-center gap-2 shadow-sm hover:bg-slate-50 transition-colors">
-              <Printer size={16}/> IMPRIMIR
+              <Printer size={16}/> <span className="hidden sm:inline">IMPRIMIR</span>
             </button>
             <button onClick={handleExportPDF} disabled={isExporting} className="px-4 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-md font-black text-[10px] md:text-xs uppercase flex items-center gap-2 shadow-lg hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors">
-              {isExporting ? <Loader2 size={16} className="animate-spin"/> : <Download size={16}/>} {isExporting ? 'PROCESSANDO' : 'GERAR PDF'}
+              {isExporting ? <Loader2 size={16} className="animate-spin"/> : <Download size={16}/>} <span className="hidden sm:inline">{isExporting ? 'PROCESSANDO' : 'GERAR PDF'}</span>
             </button>
         </div>
       </div>
 
       {/* --- ÁREA DE IMPRESSÃO / RELATÓRIO (FOLHA A4) --- */}
-      <div ref={contentRef} className={`bg-white text-black shadow-2xl relative flex flex-col mx-auto w-full md:max-w-[210mm] min-h-[280mm] p-6 transition-colors ${isCancelled ? 'grayscale opacity-75' : ''}`}>
-        
-        {/* CABEÇALHO COMPACTO */}
-        <div className="flex justify-between items-center mb-2 pb-2 border-b-2 border-slate-300">
-             {/* Logo Esquerda (Muni) */}
-             <div className="w-14 h-14 flex items-center justify-center">
-                 {customLogoLeft ? (
-                    <img src={customLogoLeft} className="max-h-full max-w-full object-contain" alt="Brasão Muni" />
-                 ) : (
-                    <div className="w-12 h-12 rounded-full border-2 border-slate-800 flex items-center justify-center bg-slate-100">
-                        <span className="text-[6px] font-black uppercase text-center text-slate-400">BRASÃO<br/>MUNI</span>
-                    </div>
-                 )}
-             </div>
-             
-             {/* Texto Central */}
-             <div className="flex-1 px-2 text-center">
-                 <h1 className="text-xs font-black uppercase text-slate-700 leading-tight tracking-tight">PREFEITURA MUNICIPAL DE ARAPONGAS</h1>
-                 <h2 className="text-[9px] font-black uppercase text-slate-800 tracking-wide mt-0.5">SECRETARIA MUNICIPAL DE SEGURANÇA PÚBLICA E TRÂNSITO</h2>
-                 <h3 className="text-[8px] font-bold uppercase text-blue-500 mt-0.5">CENTRO DE MONITORAMENTO MUNICIPAL</h3>
-             </div>
-
-             {/* Logo Direita (GCM) */}
-             <div className="w-14 h-14 flex items-center justify-center">
-                  {customLogo ? (
-                      <img src={customLogo} className="max-h-full max-w-full object-contain" alt="Brasão GCM" />
-                  ) : (
-                      <div className="w-12 h-12 rounded-full border-2 border-slate-800 flex items-center justify-center bg-slate-100">
-                            <span className="text-[6px] font-black uppercase text-center text-slate-400">BRASÃO<br/>GCM</span>
-                      </div>
-                  )}
-             </div>
-        </div>
-
-        {/* TÍTULO */}
-        <div className="text-center mb-2">
-            <h2 className="text-base font-black uppercase text-blue-900 border-b border-blue-900 inline-block px-6 pb-0.5 tracking-widest font-serif">
-                REGISTRO DE ATENDIMENTO
-            </h2>
-        </div>
-
-        {/* TABELA DE DADOS (ULTRA-COMPACTA) */}
-        <div className="border border-slate-300 rounded-lg overflow-hidden mb-3">
+      <div className="w-full overflow-x-auto md:overflow-x-visible pb-6">
+        <div ref={contentRef} className={`bg-white text-black shadow-2xl relative flex flex-col mx-auto w-full min-w-[320px] md:max-w-[210mm] min-h-[280mm] p-4 md:p-10 transition-colors ${isCancelled ? 'grayscale opacity-75' : ''}`}>
             
-            {/* LINHA 1: RA (Esq) e NATUREZA (Dir) */}
-            <div className="flex border-b border-slate-300">
-                <div className="w-32 bg-blue-50 p-1.5 border-r border-slate-300 flex flex-col justify-center text-center">
-                    <span className="text-[7px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">REGISTRO R.A</span>
-                    <span className="text-lg font-black text-blue-900 leading-none">{incident.raCode}</span>
-                </div>
-                <div className="flex-1 p-1.5 bg-slate-50 flex flex-col justify-center pl-3">
-                     <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">NATUREZA DA OCORRÊNCIA</span>
-                     <span className="text-sm font-black text-slate-900 uppercase leading-none">{incident.alterationType}</span>
-                </div>
-            </div>
-
-            {/* LINHA 2: TEMPO e LOCAL (Grid) */}
-            <div className="grid grid-cols-6 border-b border-slate-300 divide-x divide-slate-300">
-                <div className="col-span-1 p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">DATA</span>
-                    <span className="block text-[9px] font-black text-slate-900 leading-none">{new Date(incident.date).toLocaleDateString('pt-BR')}</span>
-                </div>
-                <div className="col-span-1 p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">INÍCIO</span>
-                    <span className="block text-[9px] font-black text-slate-900 leading-none">{incident.startTime}</span>
-                </div>
-                <div className="col-span-1 p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">TÉRMINO</span>
-                    <span className="block text-[9px] font-black text-slate-900 leading-none">{incident.endTime || '--:--'}</span>
-                </div>
-                <div className="col-span-3 p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">LOCAL / PRÓPRIO</span>
-                    <span className="block text-[10px] font-black text-slate-900 uppercase truncate leading-none">{building?.name || '---'}</span>
-                </div>
-            </div>
-
-            {/* LINHA 3: ENDEREÇO (Compacto) */}
-            <div className="border-b border-slate-300 px-2 py-1 bg-white">
-                 <div className="flex items-baseline gap-2">
-                    <span className="text-[7px] font-bold text-slate-400 uppercase min-w-fit">ENDEREÇO:</span>
-                    <span className="text-[9px] font-bold text-slate-700 uppercase truncate">{building?.address || '---'}</span>
-                 </div>
-            </div>
-
-            {/* LINHA 4: RESPONSÁVEIS (4 Colunas) */}
-            <div className="grid grid-cols-4 divide-x divide-slate-300">
-                <div className="p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">RESPONSÁVEL</span>
-                    <span className="block text-[9px] font-bold text-slate-900 uppercase truncate leading-none">{building?.managerName || '---'}</span>
-                </div>
-                <div className="p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">CONTATO</span>
-                    <span className="block text-[9px] font-bold text-slate-900 uppercase truncate leading-none">{building?.managerPhone || '---'}</span>
-                </div>
-                <div className="p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">CARGO</span>
-                    <span className="block text-[9px] font-bold text-slate-900 uppercase truncate leading-none">---</span>
-                </div>
-                <div className="p-1.5">
-                    <span className="block text-[7px] font-bold text-slate-400 uppercase leading-none mb-0.5">DOC</span>
-                    <span className="block text-[9px] font-bold text-slate-900 uppercase truncate leading-none">---</span>
-                </div>
-            </div>
-        </div>
-
-        {/* TÍTULO DO RELATO */}
-        <div className="text-center mb-2 relative">
-             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-300"></div></div>
-             <h3 className="relative bg-white px-4 text-xs font-bold uppercase text-blue-900 inline-block font-serif tracking-widest">
-                RELATO
-            </h3>
-        </div>
-
-        {/* CORPO DO TEXTO */}
-        <div className="text-justify text-xs leading-relaxed font-serif uppercase mb-4 whitespace-pre-wrap px-1 min-h-[2rem]">
-            {incident.description}
-        </div>
-
-        {/* FOTOS (ABAIXO DO TEXTO) */}
-        {incident.photos && incident.photos.length > 0 && (
-            <div className="mb-4 break-inside-avoid">
-                 {/* GRID 5 COLUNAS PARA ECONOMIZAR ESPAÇO VERTICAL */}
-                 <div className="grid grid-cols-5 gap-2 justify-center">
-                    {incident.photos.map((p, idx) => (
-                        <div key={idx} className="flex flex-col items-center">
-                            {/* ALTURA AUTO, ASPECT RATIO 3:4 (RETRATO) PARA FOTOS DE CELULAR */}
-                            <div className="border border-slate-300 p-0.5 bg-white shadow-sm w-full aspect-[3/4] flex items-center justify-center overflow-hidden">
-                                <img 
-                                    src={p} 
-                                    className="w-full h-full object-cover" 
-                                    alt={`Evidência ${idx + 1}`} 
-                                />
-                            </div>
-                            <span className="text-[7px] uppercase font-bold text-slate-500 mt-0.5">FOTO {idx + 1}</span>
+            {/* CABEÇALHO - BRASÕES MAIS PRÓXIMOS DAS ESCRITAS */}
+            <div className="flex justify-center items-center mb-1 pb-4 gap-4 md:gap-12">
+                {/* Logo Esquerda (Muni) */}
+                <div className="w-12 h-12 md:w-20 md:h-20 flex-shrink-0 flex items-center justify-center">
+                    {customLogoLeft ? (
+                        <img src={customLogoLeft} className="max-h-full max-w-full object-contain" alt="Brasão Muni" />
+                    ) : (
+                        <div className="w-10 h-10 md:w-16 md:h-16 rounded-full border border-slate-800 flex items-center justify-center bg-slate-50 shadow-sm">
+                            <span className="text-[5px] md:text-[7px] font-black uppercase text-center text-slate-400">BRASÃO<br/>MUNI</span>
                         </div>
-                    ))}
-                 </div>
-            </div>
-        )}
-
-        {/* RODAPÉ E ASSINATURAS (REPOSICIONADO NO FINAL DA PÁGINA) */}
-        <div className="mt-auto pt-2 break-inside-avoid w-full">
-            <div className="grid grid-cols-2 gap-6 items-end">
-                {/* Assinatura Vigilante */}
-                <div>
-                     <div className="text-[8px] font-bold uppercase text-slate-800 mb-0.5">VIGILANTES:</div>
-                     <div className="border-b border-slate-400 text-[10px] uppercase px-1 py-0.5 bg-slate-50 min-h-[20px]">{incident.vigilants}</div>
+                    )}
+                </div>
+                
+                {/* Texto Central conforme imagem */}
+                <div className="text-center min-w-0 max-w-[60%]">
+                    <h1 className="text-[10px] md:text-[14px] font-black uppercase text-slate-900 leading-tight tracking-tight whitespace-nowrap">
+                        PREFEITURA MUNICIPAL DE ARAPONGAS
+                    </h1>
+                    <h2 className="text-[8px] md:text-[12px] font-black uppercase text-slate-900 tracking-wide mt-0.5 md:mt-1">
+                        SECRETARIA MUNICIPAL DE SEGURANÇA PÚBLICA E TRÂNSITO
+                    </h2>
+                    <h3 className="text-[7px] md:text-[10px] font-bold uppercase text-blue-600 mt-0.5 tracking-wider">
+                        CENTRO DE MONITORAMENTO MUNICIPAL
+                    </h3>
                 </div>
 
-                {/* Validação Supervisor - Box Destacado Compacto */}
-                {incident.approvedBy ? (
-                    <div className="border-2 border-slate-900 p-2 relative bg-slate-100 min-w-[180px]">
-                         <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-white px-2 py-0.5 text-[7px] font-black uppercase text-slate-900 tracking-widest border-2 border-slate-900 leading-none whitespace-nowrap">
-                             SUPERVISOR RESPONSÁVEL
-                         </div>
-                         <div className="flex flex-col items-center justify-center gap-1 pt-2">
-                             <div className="text-center">
-                                <span className="text-xs font-black text-slate-900 uppercase leading-none block scale-y-110">{incident.approvedBy}</span>
-                             </div>
-                             <div className="w-full border-t border-slate-400 mt-1 pt-1 flex flex-col items-center">
-                                <span className="text-[6px] font-bold uppercase text-slate-600 tracking-wider flex items-center gap-1">
-                                    <ShieldCheck size={6} className="text-slate-900" /> ASSINADO DIGITALMENTE
-                                </span>
-                                <span className="text-[7px] font-mono font-bold text-slate-800">
-                                    {new Date(incident.approvedAt!).toLocaleDateString('pt-BR')} ÀS {new Date(incident.approvedAt!).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
-                                </span>
-                             </div>
-                         </div>
-                    </div>
-                ) : (
-                    <div className="border-2 border-dashed border-slate-300 p-2 text-center">
-                        <span className="text-[8px] font-bold text-slate-400 uppercase">AGUARDANDO VALIDAÇÃO</span>
-                    </div>
-                )}
+                {/* Logo Direita (GCM) */}
+                <div className="w-12 h-12 md:w-20 md:h-20 flex-shrink-0 flex items-center justify-center">
+                    {customLogo ? (
+                        <img src={customLogo} className="max-h-full max-w-full object-contain" alt="Brasão GCM" />
+                    ) : (
+                        <div className="w-10 h-10 md:w-16 md:h-16 rounded-full border border-slate-800 flex items-center justify-center bg-slate-50 shadow-sm">
+                                <span className="text-[5px] md:text-[7px] font-black uppercase text-center text-slate-400">BRASÃO<br/>GCM</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="mt-2 border-t border-slate-300 pt-1 flex justify-between text-[6px] text-slate-400 uppercase">
-                <span>CENTRO DE MONITORAMENTO - S.M.S.P.T</span>
-                <span>IMPRESSO EM {new Date().toLocaleDateString('pt-BR')}</span>
+            {/* LINHA DE DIVISÃO SUPERIOR (AZUL) */}
+            <div className="w-full h-0.5 bg-blue-900/80 mb-2"></div>
+
+            {/* TÍTULO COM LINHAS LATERAIS */}
+            <div className="flex items-center gap-4 mb-2">
+                <div className="flex-1 h-px bg-blue-900/30"></div>
+                <h2 className="text-[12px] md:text-[18px] font-black uppercase text-blue-900 tracking-[0.2em] font-serif whitespace-nowrap">
+                    REGISTRO DE ATENDIMENTO
+                </h2>
+                <div className="flex-1 h-px bg-blue-900/30"></div>
             </div>
+
+            {/* LINHA DE DIVISÃO INFERIOR (AZUL) */}
+            <div className="w-full h-0.5 bg-blue-900/80 mb-6"></div>
+
+            {/* TABELA DE DADOS */}
+            <div className="border border-slate-400 rounded-lg overflow-hidden mb-6">
+                
+                {/* LINHA 1: RA e NATUREZA */}
+                <div className="flex border-b border-slate-400">
+                    <div className="w-28 md:w-36 bg-blue-50/50 p-2 md:p-4 border-r border-slate-400 flex flex-col justify-center text-center">
+                        <span className="text-[7px] md:text-[9px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">REGISTRO R.A</span>
+                        <span className="text-lg md:text-2xl font-black text-blue-900 leading-none">{incident.raCode}</span>
+                    </div>
+                    <div className="flex-1 p-2 md:p-4 bg-white flex flex-col justify-center pl-4">
+                        <span className="text-[7px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">NATUREZA DA ALTERAÇÃO</span>
+                        <span className="text-sm md:text-lg font-black text-slate-900 uppercase leading-none">{incident.alterationType}</span>
+                    </div>
+                </div>
+
+                {/* LINHA 2: TEMPO e LOCAL */}
+                <div className="grid grid-cols-6 border-b border-slate-400 divide-x divide-slate-400">
+                    <div className="col-span-1 p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">DATA</span>
+                        <span className="block text-[9px] md:text-[11px] font-black text-slate-900 leading-none whitespace-nowrap">{new Date(incident.date).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    <div className="col-span-1 p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">INÍCIO</span>
+                        <span className="block text-[9px] md:text-[11px] font-black text-slate-900 leading-none">{incident.startTime}</span>
+                    </div>
+                    <div className="col-span-1 p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">TÉRMINO</span>
+                        <span className="block text-[9px] md:text-[11px] font-black text-slate-900 leading-none">{incident.endTime || '--:--'}</span>
+                    </div>
+                    <div className="col-span-3 p-2 md:p-3 bg-slate-50/30">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">LOCAL / PRÓPRIO</span>
+                        <span className="block text-[10px] md:text-[12px] font-black text-slate-900 uppercase truncate leading-none">{building?.name || '---'}</span>
+                    </div>
+                </div>
+
+                {/* LINHA 3: ENDEREÇO */}
+                <div className="border-b border-slate-400 px-3 py-2 bg-white">
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-[7px] md:text-[8px] font-bold text-slate-400 uppercase min-w-fit tracking-tighter">ENDEREÇO:</span>
+                        <span className="text-[10px] md:text-[12px] font-bold text-slate-700 uppercase truncate">{building?.address || '---'}</span>
+                    </div>
+                </div>
+
+                {/* LINHA 4: RESPONSÁVEIS */}
+                <div className="grid grid-cols-4 divide-x divide-slate-400">
+                    <div className="p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">RESPONSÁVEL</span>
+                        <span className="block text-[9px] md:text-[11px] font-bold text-slate-900 uppercase truncate leading-none">{building?.managerName || '---'}</span>
+                    </div>
+                    <div className="p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">CONTATO</span>
+                        <span className="block text-[9px] md:text-[11px] font-bold text-slate-900 uppercase truncate leading-none">{building?.managerPhone || '---'}</span>
+                    </div>
+                    <div className="p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">CARGO</span>
+                        <span className="block text-[9px] md:text-[11px] font-bold text-slate-900 uppercase truncate leading-none">---</span>
+                    </div>
+                    <div className="p-2 md:p-3">
+                        <span className="block text-[7px] md:text-[8px] font-bold text-slate-400 uppercase leading-none mb-1">DOC</span>
+                        <span className="block text-[9px] md:text-[11px] font-bold text-slate-900 uppercase truncate leading-none">---</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* TÍTULO DO RELATO */}
+            <div className="text-center mb-4 relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-300"></div></div>
+                <h3 className="relative bg-white px-6 text-[11px] md:text-[14px] font-black uppercase text-blue-900 inline-block font-serif tracking-[0.3em]">
+                    RELATO
+                </h3>
+            </div>
+
+            {/* CORPO DO TEXTO */}
+            <div className="text-justify text-[11px] md:text-[13px] leading-relaxed font-serif uppercase mb-8 whitespace-pre-wrap px-2 min-h-[6rem] text-slate-900">
+                {incident.description}
+            </div>
+
+            {/* FOTOS */}
+            {incident.photos && incident.photos.length > 0 && (
+                <div className="mb-8 break-inside-avoid">
+                    <div className="grid grid-cols-5 gap-2 md:gap-4 justify-center">
+                        {incident.photos.map((p, idx) => (
+                            <div key={idx} className="flex flex-col items-center">
+                                <div className="border border-slate-400 p-1 bg-white shadow-sm w-full aspect-[3/4] flex items-center justify-center overflow-hidden rounded-sm">
+                                    <img 
+                                        src={p} 
+                                        className="w-full h-full object-cover" 
+                                        alt={`Evidência ${idx + 1}`} 
+                                    />
+                                </div>
+                                <span className="text-[6px] md:text-[8px] uppercase font-black text-slate-500 mt-1.5">FOTO {idx + 1}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* RODAPÉ E ASSINATURAS */}
+            <div className="mt-auto pt-6 break-inside-avoid w-full border-t-2 border-slate-100">
+                <div className="grid grid-cols-2 gap-6 md:gap-12 items-end">
+                    {/* Assinatura Vigilante */}
+                    <div className="min-w-0">
+                        <div className="text-[7px] md:text-[9px] font-black uppercase text-slate-800 mb-2 tracking-wider">AGENTE(S) RESPONSÁVEL(IS):</div>
+                        <div className="border-b-2 border-slate-400 text-[10px] md:text-[12px] uppercase px-1 py-2 bg-slate-50/50 min-h-[40px] leading-tight font-bold italic">
+                            {incident.vigilants}
+                        </div>
+                    </div>
+
+                    {/* Validação Supervisor */}
+                    <div className="min-w-0">
+                        {incident.approvedBy ? (
+                            <div className="border-2 border-slate-900 p-3 relative bg-slate-50 min-w-full rounded-sm shadow-sm">
+                                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-white px-3 py-0.5 text-[6px] md:text-[8px] font-black uppercase text-slate-900 tracking-widest border border-slate-900 leading-none whitespace-nowrap">
+                                    AUTORIDADE VALIDANTE
+                                </div>
+                                <div className="flex flex-col items-center justify-center gap-1 pt-2">
+                                    <div className="text-center">
+                                        <span className="text-[10px] md:text-[14px] font-black text-slate-900 uppercase leading-none block scale-y-110 truncate max-w-full mb-1">{incident.approvedBy}</span>
+                                    </div>
+                                    <div className="w-full border-t border-slate-400 mt-1 pt-2 flex flex-col items-center">
+                                        <span className="text-[6px] md:text-[7px] font-bold uppercase text-slate-600 tracking-widest flex items-center gap-1">
+                                            <ShieldCheck size={8} className="text-blue-900" /> CERTIFICADO DIGITALMENTE
+                                        </span>
+                                        <span className="text-[7px] md:text-[9px] font-mono font-black text-slate-800 mt-0.5">
+                                            DATA: {new Date(incident.approvedAt!).toLocaleDateString('pt-BR')} ÀS {new Date(incident.approvedAt!).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="border-2 border-dashed border-slate-300 p-6 text-center bg-slate-50/30 rounded-sm">
+                                <span className="text-[8px] md:text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">AGUARDANDO VALIDAÇÃO</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-2 flex justify-between text-[6px] md:text-[8px] text-slate-400 uppercase font-bold border-t border-slate-100">
+                    <span>CENTRO DE MONITORAMENTO - S.M.S.P.T</span>
+                    <span className="tracking-widest">IMPRESSO EM {new Date().toLocaleDateString('pt-BR')} ÀS {new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+            </div>
+
+            {/* MARCA D'ÁGUA SE CANCELADO */}
+            {isCancelled && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-10">
+                    <span className="text-[60px] md:text-[120px] font-black text-red-600 transform -rotate-45 border-8 md:border-[16px] border-red-600 p-6 md:p-12 rounded-3xl">CANCELADO</span>
+                </div>
+            )}
         </div>
-
-        {/* MARCA D'ÁGUA SE CANCELADO */}
-        {isCancelled && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-20">
-                <span className="text-[100px] font-black text-red-600 transform -rotate-45 border-8 border-red-600 p-8 rounded-3xl">CANCELADO</span>
-            </div>
-        )}
       </div>
     </div>
   );

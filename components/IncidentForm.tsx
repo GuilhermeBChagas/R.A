@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Incident, Building, User, AlterationType } from '../types';
-import { Save, X, Clock, MapPin, FileText, Loader2, Search, Users, Navigation, Check, AlertTriangle, Plus, UserPlus, UserMinus, Calendar, ChevronDown, Send } from 'lucide-react';
+import { Save, X, Clock, MapPin, FileText, Loader2, Search, Users, Navigation, Check, AlertTriangle, Plus, UserPlus, UserMinus, Calendar, ChevronDown, Send, Camera, ImagePlus, Trash2, Zap } from 'lucide-react';
 
 interface IncidentFormProps {
   user: User;
@@ -36,6 +35,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   const [endTime, setEndTime] = useState('');
   const [alterationType, setAlterationType] = useState('');
   const [description, setDescription] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
 
   // Building Search State
   const [buildingSearch, setBuildingSearch] = useState('');
@@ -47,6 +47,12 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   const [vigilantSearch, setVigilantSearch] = useState('');
   const [isVigilantDropdownOpen, setIsVigilantDropdownOpen] = useState(false);
   const vigilantContainerRef = useRef<HTMLDivElement>(null);
+
+  // Camera State
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -60,6 +66,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
       setEndTime(initialData.endTime);
       setAlterationType(initialData.alterationType);
       setDescription(initialData.description);
+      setPhotos(initialData.photos || []);
     } else {
         const now = new Date();
         setDate(now.toISOString().split('T')[0]);
@@ -74,6 +81,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
         }
         setAlterationType('');
         setDescription('');
+        setPhotos([]);
     }
   }, [initialData, user, preSelectedBuildingId, buildings]);
 
@@ -155,6 +163,70 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
     setVigilantsList(vigilantsList.filter(v => v !== name));
   };
 
+  // --- Image Handling ---
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    // Fix: Explicitly cast FileList to File[] to avoid 'unknown' type inference in some environments (e.g. Line 178)
+    (Array.from(files) as File[]).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotos(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      });
+      setStream(mediaStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      setIsCameraOpen(true);
+    } catch (err) {
+      console.error("Erro ao acessar câmera:", err);
+      alert("Não foi possível acessar a câmera. Verifique as permissões.");
+    }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setIsCameraOpen(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setPhotos(prev => [...prev, dataUrl]);
+        stopCamera();
+      }
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!buildingId) {
@@ -180,7 +252,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
           description,
           status: initialData?.status || 'PENDING',
           timestamp: initialData?.timestamp || new Date().toISOString(),
-          photos: initialData?.photos || [],
+          photos: photos,
           aiAnalysis: initialData?.aiAnalysis,
           severity: initialData?.severity
       };
@@ -192,7 +264,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
   return (
     <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden transition-all animate-in zoom-in-95 duration-300 mb-20">
         
-        {/* HEADER MODERNO CONFORME IMAGEM */}
+        {/* HEADER MODERNO */}
         <div className="px-8 py-6 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/30">
@@ -206,7 +278,6 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                 </div>
             </div>
             
-            {/* RA BADGE NO TOPO */}
             <div className="bg-white dark:bg-slate-900 border-2 border-blue-600 px-4 py-2 rounded-xl flex flex-col items-center justify-center min-w-[120px] shadow-sm">
                 <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">CÓDIGO R.A</span>
                 <span className="text-lg font-black text-slate-800 dark:text-white leading-none">{currentRa}</span>
@@ -217,7 +288,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
             
             {/* LINHA 1: PRÓPRIO E VIGILANTES */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* PRÓPRIO COM PESQUISA E GPS */}
+                {/* PRÓPRIO */}
                 <div className="space-y-2" ref={buildingContainerRef}>
                     <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">PRÓPRIO</label>
                     <div className="relative flex gap-2">
@@ -240,13 +311,11 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                             type="button"
                             onClick={handleLocateNearest}
                             disabled={isLocating}
-                            title="Localizar prédio mais próximo"
                             className="p-3.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-2 border-blue-100 dark:border-blue-800 rounded-2xl hover:bg-blue-100 transition-colors flex-shrink-0 active:scale-95"
                         >
                             {isLocating ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                         </button>
 
-                        {/* Dropdown de Prédios */}
                         {isBuildingDropdownOpen && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto animate-in slide-in-from-top-2">
                                 {filteredBuildings.map(b => (
@@ -269,9 +338,6 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                                         </div>
                                     </button>
                                 ))}
-                                {filteredBuildings.length === 0 && (
-                                    <div className="p-6 text-center text-slate-400 text-xs font-bold uppercase">Nenhum local encontrado</div>
-                                )}
                             </div>
                         )}
                     </div>
@@ -280,7 +346,6 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                 {/* VIGILANTES */}
                 <div className="space-y-2" ref={vigilantContainerRef}>
                     <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">VIGILANTES</label>
-                    
                     <div className="relative">
                         <div className="relative group">
                             <Search className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
@@ -296,8 +361,7 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                                 className="w-full pl-10 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold uppercase outline-none focus:border-blue-500 transition-all"
                             />
                         </div>
-
-                        {isVigilantDropdownOpen && (vigilantSearch.length > 0 || isVigilantDropdownOpen) && (
+                        {isVigilantDropdownOpen && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 max-h-64 overflow-y-auto animate-in slide-in-from-top-2">
                                 {filteredUsers.map(u => {
                                     const isAlreadyAdded = vigilantsList.includes(u.name);
@@ -315,54 +379,26 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                                                 <p className={`text-xs font-black uppercase truncate leading-none ${isAlreadyAdded ? 'text-emerald-600' : 'text-slate-800 dark:text-slate-100'}`}>{u.name}</p>
                                                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">Matrícula: {u.matricula}</p>
                                             </div>
-                                            <div className={`p-2 rounded-lg transition-colors ${isAlreadyAdded ? 'bg-red-50 text-red-500 opacity-0 group-hover:opacity-100' : 'bg-blue-50 text-blue-600'}`}>
-                                                {isAlreadyAdded ? <UserMinus size={16} /> : <UserPlus size={16} />}
-                                            </div>
                                         </button>
                                     );
                                 })}
-                                {filteredUsers.length === 0 && (
-                                    <div className="p-8 text-center">
-                                        <Users className="mx-auto text-slate-200 mb-2" size={32} />
-                                        <p className="text-xs text-slate-400 font-bold uppercase">Nenhum vigilante encontrado</p>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
-
                     <div className="flex flex-wrap gap-2 mt-3 min-h-[40px]">
                         {vigilantsList.map(v => (
-                            <div 
-                                key={v} 
-                                className="inline-flex items-center gap-2 pl-1 pr-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full shadow-sm animate-in zoom-in-90"
-                            >
-                                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-black uppercase">
-                                    {v.charAt(0)}
-                                </div>
-                                <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">{v}</span>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleRemoveVigilant(v)}
-                                    className="p-1 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors text-slate-400"
-                                    title="Remover"
-                                >
-                                    <X size={12} />
-                                </button>
+                            <div key={v} className="inline-flex items-center gap-2 pl-1 pr-3 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full shadow-sm">
+                                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-[10px] font-black uppercase">{v.charAt(0)}</div>
+                                <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 uppercase">{v}</span>
+                                <button type="button" onClick={() => handleRemoveVigilant(v)} className="p-1 hover:text-red-500 text-slate-400"><X size={12} /></button>
                             </div>
                         ))}
-                        {vigilantsList.length === 0 && (
-                            <div className="flex items-center gap-2 text-slate-400 italic text-[10px] font-medium uppercase ml-1">
-                                <Users size={12} /> Selecione os agentes presentes na ocorrência...
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
 
             {/* NATUREZA E REGISTRO DE TEMPO */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-                {/* TIPO DE ALTERAÇÃO */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
                 <div className="md:col-span-4 space-y-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 whitespace-nowrap">TIPO DE ALTERAÇÃO</label>
                     <div className="relative">
@@ -379,46 +415,26 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                     </div>
                 </div>
                 
-                {/* Registro de Tempo */}
-                <div className="md:col-span-8">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA</label>
-                            <div className="relative">
-                                <Calendar className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
-                                <input 
-                                    type="date" 
-                                    required
-                                    value={date} 
-                                    onChange={e => setDate(e.target.value)} 
-                                    className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 transition-all uppercase" 
-                                />
-                            </div>
+                <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
+                            <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 transition-all uppercase" />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HORA INICIAL</label>
-                            <div className="relative">
-                                <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
-                                <input 
-                                    type="time" 
-                                    required 
-                                    value={startTime} 
-                                    onChange={e => setStartTime(e.target.value)} 
-                                    className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" 
-                                />
-                            </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HORA INICIAL</label>
+                        <div className="relative">
+                            <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
+                            <input type="time" required value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" />
                         </div>
-                        <div className="space-y-1.5">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HORA FINAL</label>
-                            <div className="relative">
-                                <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
-                                <input 
-                                    type="time" 
-                                    value={endTime} 
-                                    onChange={e => setEndTime(e.target.value)} 
-                                    className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" 
-                                />
-                            </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">HORA FINAL</label>
+                        <div className="relative">
+                            <Clock className="absolute left-3.5 top-3.5 text-slate-400" size={16}/>
+                            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full pl-11 p-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500" />
                         </div>
                     </div>
                 </div>
@@ -431,33 +447,102 @@ export const IncidentForm: React.FC<IncidentFormProps> = ({
                     required 
                     value={description} 
                     onChange={e => setDescription(e.target.value)} 
-                    rows={8} 
+                    rows={6} 
                     className="w-full p-6 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-3xl text-sm font-medium outline-none focus:border-blue-500 transition-all uppercase resize-none shadow-inner" 
                     placeholder="DESCREVA A ALTERAÇÃO"
                  />
             </div>
 
-            {/* FOOTER COM BOTÕES */}
-            <div className="flex flex-col-reverse sm:flex-row justify-end items-center gap-4 pt-8 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                    <button 
-                        type="button" 
-                        onClick={onCancel} 
-                        className="w-full sm:w-auto py-4 px-8 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-black uppercase text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
-                    >
-                        CANCELAR
-                    </button>
-                    <button 
-                        type="submit" 
-                        disabled={isLoading} 
-                        className="w-full sm:w-auto py-4 px-10 bg-blue-900 dark:bg-blue-700 text-white rounded-2xl text-xs font-black uppercase shadow-xl shadow-blue-900/20 hover:bg-blue-800 dark:hover:bg-blue-600 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70"
-                    >
-                        {isLoading ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
-                        {initialData ? 'SALVAR ALTERAÇÕES' : 'FINALIZAR REGISTRO'}
-                    </button>
+            {/* ANEXOS E FOTOS */}
+            <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">EVIDÊNCIAS FOTOGRÁFICAS</label>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <button 
+                            type="button"
+                            onClick={() => document.getElementById('file-upload')?.click()}
+                            className="flex-1 sm:flex-none px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-100 dark:border-slate-700 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-sm active:scale-95"
+                        >
+                            <ImagePlus size={16} /> Adicionar Foto
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={startCamera}
+                            className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+                        >
+                            <Camera size={16} /> Abrir Câmera
+                        </button>
+                        <input id="file-upload" type="file" accept="image/*" multiple onChange={handleFileSelect} className="hidden" />
+                    </div>
                 </div>
+
+                {/* Preview Grid */}
+                {photos.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700">
+                        {photos.map((photo, index) => (
+                            <div key={index} className="relative group aspect-square rounded-2xl overflow-hidden border-2 border-white dark:border-slate-700 shadow-md">
+                                <img src={photo} className="w-full h-full object-cover" alt={`Evidence ${index}`} />
+                                <button 
+                                    type="button" 
+                                    onClick={() => removePhoto(index)}
+                                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/40 py-1 text-center">
+                                    <span className="text-[8px] font-black text-white uppercase tracking-widest">FOTO {index + 1}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* FOOTER */}
+            <div className="flex flex-col-reverse sm:flex-row justify-end items-center gap-4 pt-8 border-t border-slate-100 dark:border-slate-800">
+                <button type="button" onClick={onCancel} className="w-full sm:w-auto py-4 px-8 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-black uppercase text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition-all active:scale-95">CANCELAR</button>
+                <button type="submit" disabled={isLoading} className="w-full sm:w-auto py-4 px-10 bg-blue-900 dark:bg-blue-700 text-white rounded-2xl text-xs font-black uppercase shadow-xl shadow-blue-900/20 hover:bg-blue-800 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70">
+                    {isLoading ? <Loader2 className="animate-spin" size={18} /> : <FileText size={18} />}
+                    {initialData ? 'SALVAR ALTERAÇÕES' : 'FINALIZAR REGISTRO'}
+                </button>
             </div>
         </form>
+
+        {/* Camera Modal Overlay */}
+        {isCameraOpen && (
+            <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4">
+                <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+                    <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                    <canvas ref={canvasRef} className="hidden" />
+                    
+                    {/* Camera Controls Overlay */}
+                    <div className="absolute inset-0 flex flex-col justify-between p-6 pointer-events-none">
+                        <div className="flex justify-between items-start">
+                             <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/20">
+                                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Câmera HD Ativa</span>
+                             </div>
+                             <button type="button" onClick={stopCamera} className="p-3 bg-black/50 backdrop-blur-md text-white rounded-2xl border border-white/20 pointer-events-auto active:scale-90 transition-transform"><X size={24} /></button>
+                        </div>
+
+                        <div className="flex flex-col items-center gap-6 pb-4">
+                            <div className="flex items-center gap-8">
+                                <button 
+                                    type="button" 
+                                    onClick={capturePhoto} 
+                                    className="p-8 bg-white text-slate-900 rounded-full shadow-2xl border-8 border-white/20 pointer-events-auto active:scale-90 transition-transform group"
+                                >
+                                    <div className="bg-slate-100 rounded-full p-2 group-hover:scale-110 transition-transform">
+                                        <Camera size={32} />
+                                    </div>
+                                </button>
+                            </div>
+                            <p className="text-[10px] font-black text-white/60 uppercase tracking-widest bg-black/40 px-4 py-1 rounded-full">Toque no botão para capturar a evidência</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
